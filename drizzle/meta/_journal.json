@@ -15,6 +15,13 @@
       "when": 1784550060000,
       "tag": "0001_barcode_aliases",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784550120000,
+      "tag": "0002_admin_sessions",
+      "breakpoints": true
     }
   ]
 }

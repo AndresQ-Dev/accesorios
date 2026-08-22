@@ -39,3 +39,19 @@ export const barcodeAliases = sqliteTable('barcode_aliases', {
   alias: text('alias').primaryKey(),
   productId: integer('product_id').notNull().references(() => products.id, { onDelete: 'restrict' }),
 });
+
+export const adminSessions = sqliteTable('admin_sessions', {
+  tokenHash: text('token_hash').primaryKey(),
+  csrfToken: text('csrf_token').notNull(),
+  expiresAt: text('expires_at').notNull(),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export const auditLog = sqliteTable('audit_log', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  actorSessionHash: text('actor_session_hash').notNull(),
+  action: text('action').notNull(),
+  productId: integer('product_id').references(() => products.id, { onDelete: 'restrict' }),
+  details: text('details').notNull(),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});

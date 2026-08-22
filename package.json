@@ -12,6 +12,7 @@
     "db:migrate": "tsx src/db/migrate.ts"
   },
   "dependencies": {
+    "@node-rs/argon2": "2.1.0",
     "@astrojs/node": "11.1.4",
     "astro": "7.2.4",
     "better-sqlite3": "13.0.3",

@@ -34,3 +34,8 @@ export const products = sqliteTable('products', {
   index('products_brand_key_index').on(table.brandKey),
   index('products_category_id_index').on(table.categoryId),
 ]);
+
+export const barcodeAliases = sqliteTable('barcode_aliases', {
+  alias: text('alias').primaryKey(),
+  productId: integer('product_id').notNull().references(() => products.id, { onDelete: 'restrict' }),
+});

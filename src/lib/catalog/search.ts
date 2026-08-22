@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3';
+import { resolveBarcodeProductId } from './aliases';
 
 const UNDEFINED_LABEL = 'Sin definir';
 
@@ -34,7 +35,8 @@ export function normalizeSearchText(value: string) {
   return value.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('es-AR');
 }
 
-function rankProduct(product: ProductRow, query: string) {
+function rankProduct(product: ProductRow, query: string, resolvedBarcodeProductId: number | undefined) {
+  if (product.id === resolvedBarcodeProductId) return 0;
   if (product.barcode !== null && normalizeSearchText(product.barcode) === query) return 0;
   if (product.codeKey === query) return 1;
   if (product.codeKey.startsWith(query)) return 2;
@@ -58,6 +60,7 @@ function compareProducts(left: ProductRow, right: ProductRow) {
 
 export function searchCatalog(sqlite: Database.Database, rawQuery: string): CatalogSearchResponse {
   const query = normalizeSearchText(rawQuery);
+  const resolvedBarcodeProductId = resolveBarcodeProductId(sqlite, query);
   const products = sqlite.prepare(`
     SELECT products.id, products.code, products.code_key AS codeKey, products.barcode,
       products.brand, products.article, categories.name AS category, products.price_ars AS priceArs,
@@ -66,7 +69,7 @@ export function searchCatalog(sqlite: Database.Database, rawQuery: string): Cata
     LEFT JOIN categories ON categories.id = products.category_id
   `).all() as ProductRow[];
   const rankedProducts = products
-    .map((product) => ({ product, rank: rankProduct(product, query) }))
+    .map((product) => ({ product, rank: rankProduct(product, query, resolvedBarcodeProductId) }))
     .filter((entry): entry is { product: ProductRow; rank: number } => entry.rank !== null)
     .sort((left, right) => left.rank - right.rank || compareProducts(left.product, right.product));
   const metadata = sqlite.prepare(`

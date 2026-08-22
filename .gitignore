@@ -1,0 +1,7 @@
+# Local example catalog inputs; never commit shop data or product-label photos.
+SAN_JUAN_CASCOS.xlsx
+ejemplo_barras.jpeg
+
+node_modules/
+dist/
+data/

@@ -30,8 +30,13 @@
         </div>
       </form>
 
-      <button class="scan" type="button" disabled aria-describedby="scan-note">Scan barcode <span aria-hidden="true">·</span> Coming next</button>
-      <p class="scan-note" id="scan-note">Camera scanning is not available yet. Manual search works now.</p>
+      <button class="scan" id="scan" type="button" aria-describedby="scan-note">Scan barcode</button>
+      <p class="scan-note" id="scan-note">Camera stays on this device. You can always search manually.</p>
+      <section class="scanner" id="scanner" aria-label="Barcode scanner" hidden>
+        <div class="scan-band"><video id="camera" muted playsinline></video></div>
+        <p>Hold the barcode inside the band. Improve the light or steady the phone if it is blurry.</p>
+        <div class="scanner-actions"><button id="torch" type="button" hidden>Turn on light</button><button id="cancel-scan" type="button">Cancel scan</button></div>
+      </section>
 
       <section id="status" class="status" aria-live="polite" aria-atomic="true" role="status">
         Enter a code or article to see the current price.
@@ -40,6 +45,8 @@
     </main>
 
     <script>
+      import { createBrowserScanner, type ScannerState } from '../client/scanner';
+
       type SearchResult = { code: string; brand: string; article: string; category: string; priceArs: number };
       type SearchResponse = { results: SearchResult[]; freshness: string | null };
       const form = document.querySelector<HTMLFormElement>('#lookup-form')!;
@@ -47,6 +54,11 @@
       const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
       const status = document.querySelector<HTMLElement>('#status')!;
       const result = document.querySelector<HTMLElement>('#result')!;
+      const scan = document.querySelector<HTMLButtonElement>('#scan')!;
+      const scannerPanel = document.querySelector<HTMLElement>('#scanner')!;
+      const camera = document.querySelector<HTMLVideoElement>('#camera')!;
+      const torch = document.querySelector<HTMLButtonElement>('#torch')!;
+      const cancelScan = document.querySelector<HTMLButtonElement>('#cancel-scan')!;
 
       function formatArs(value: number) {
         return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
@@ -76,9 +88,7 @@
         setStatus('Current price found.', 'success');
       }
 
-      form.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        const query = input.value.trim();
+      async function lookup(query: string, decoded = false) {
         if (!query) { setStatus('Enter a code, article, brand, or category to search.', 'error'); input.focus(); return; }
         submit.disabled = true; showLoading();
         try {
@@ -86,7 +96,7 @@
           if (response.status === 400) throw new Error('invalid-query');
           if (!response.ok) throw new Error('server-failure');
           const data = await response.json() as SearchResponse;
-          if (data.results.length === 0) { result.hidden = true; setStatus('No matching price was found. Check the code or try a different article.', 'empty'); return; }
+          if (data.results.length === 0) { result.hidden = true; setStatus(decoded ? 'Barcode decoded, but no matching price was found. Try a manual search.' : 'No matching price was found. Check the code or try a different article.', 'empty'); return; }
           showResult(data.results[0], data.freshness);
         } catch (error) {
           result.hidden = true;
@@ -94,7 +104,27 @@
             ? 'Enter a valid code or article, then try again.'
             : 'Unable to check the price right now. Check the connection and try again.', 'error');
         } finally { submit.disabled = false; result.setAttribute('aria-busy', 'false'); }
+      }
+
+      function scannerState(state: ScannerState) {
+        const messages: Record<ScannerState, string> = {
+          insecure: 'Camera scanning needs HTTPS. Manual search is still available.', unsupported: 'This browser cannot scan this barcode. Use manual search.',
+          'permission-denied': 'Camera permission was denied. Allow it in browser settings or search manually.', 'camera-error': 'The camera could not start. Close other camera apps and try again.',
+          scanning: 'Scanning locally. No camera images leave this device.', slow: 'Still looking. Improve the light, hold steady, or search manually.',
+        };
+        setStatus(messages[state], state === 'scanning' ? 'info' : 'error');
+      }
+      const scanner = createBrowserScanner(camera, {
+        onState: scannerState, onTorch: (available) => { torch.hidden = !available; },
+        onDecode: (text) => { scannerPanel.hidden = true; input.value = text; setStatus('Barcode decoded. Checking the current price…', 'loading'); void lookup(text, true); },
       });
+      function closeScanner(message = 'Scan cancelled. Manual search is ready.') { scanner.stop(); scannerPanel.hidden = true; torch.hidden = true; setStatus(message); scan.focus(); }
+      scan.addEventListener('click', () => { scannerPanel.hidden = false; torch.hidden = true; torch.textContent = 'Turn on light'; void scanner.start(); });
+      cancelScan.addEventListener('click', () => closeScanner());
+      torch.addEventListener('click', async () => { const on = torch.textContent === 'Turn on light'; if (await scanner.toggleTorch(on)) torch.textContent = on ? 'Turn off light' : 'Turn on light'; });
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') scanner.stop(); });
+      window.addEventListener('pagehide', () => scanner.stop());
+      form.addEventListener('submit', (event) => { event.preventDefault(); void lookup(input.value.trim()); });
     </script>
   </body>
 </html>
@@ -117,8 +147,15 @@
   button:hover { background: #083a99; }
   button:disabled { border-color: #9ca7ae; color: #56646c; background: #e4e9e9; cursor: not-allowed; }
   :focus-visible { outline: 3px solid #f5b800; outline-offset: 3px; }
-  .scan { width: 100%; margin-top: 1rem; border-color: #aab5b7; }
+  .scan { width: 100%; margin-top: 1rem; }
   .scan-note, .freshness { margin: .5rem 0 0; color: #52616a; font-size: .875rem; line-height: 1.45; }
+  .scanner { margin-top: 1rem; padding: 1rem; border: 1px solid #80908f; background: #e8efed; }
+  .scan-band { position: relative; overflow: hidden; min-height: 10rem; background: #14202a; }
+  .scan-band::after { position: absolute; inset: 42% .75rem; border: 2px solid #f5b800; content: ''; pointer-events: none; }
+  video { display: block; width: 100%; min-height: 10rem; object-fit: cover; }
+  .scanner p { margin: .75rem 0; line-height: 1.45; }
+  .scanner-actions { display: grid; gap: .75rem; }
+  #cancel-scan { border-color: #52616a; background: #fff; color: #14202a; }
   .status { min-height: 3rem; margin: 1.5rem 0 0; font-weight: 650; line-height: 1.45; }
   .status[data-tone="error"] { color: #9b1c1c; }
   .status[data-tone="success"] { color: #14644f; }
@@ -130,7 +167,7 @@
   .price { color: #0a402f; font-size: 3rem; font-weight: 800; line-height: 1; letter-spacing: -.04em; }
   .details { margin-top: .875rem; font-weight: 700; }
   @keyframes pulse { to { opacity: .52; } }
-  @media (min-width: 34rem) { .search-row { grid-template-columns: 1fr auto; } }
+  @media (min-width: 34rem) { .search-row { grid-template-columns: 1fr auto; } .scanner-actions { grid-template-columns: auto auto; justify-content: start; } }
   @media (max-height: 32rem) and (orientation: landscape) { main { padding-top: 1rem; padding-bottom: 1rem; } header { margin-bottom: 1rem; } .intro { display: none; } .price { font-size: 2.5rem; } }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; scroll-behavior: auto !important; } }
 </style>

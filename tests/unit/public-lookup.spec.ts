@@ -20,6 +20,8 @@ describe('public manual lookup page', () => {
     expect(page).toContain('response.status === 400');
     expect(page).toContain('No matching price was found');
     expect(page).toContain('Unable to check the price right now');
-    expect(page).toContain('disabled');
+    expect(page).toContain('Barcode decoded, but no matching price was found');
+    expect(page).toContain('cancel-scan');
+    expect(page).toContain('Camera scanning needs HTTPS');
   });
 });

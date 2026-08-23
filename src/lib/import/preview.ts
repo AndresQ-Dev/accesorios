@@ -2,12 +2,15 @@ import { createHash } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import ExcelJS from 'exceljs';
 import { normalizeSearchText } from '../catalog/search';
+import { getCatalogVersion } from '../catalog/version';
 import { HttpError } from '../http/request';
 import { XLSX_LIMITS, preflightXlsx } from './preflight';
 
 const HEADERS = ['Código', 'C.Barras', 'Articulo', 'Stock fisico', 'Precio'];
 const invalid = (message: string) => new HttpError(422, 'INVALID_XLSX', message);
 export type PreviewRow = { code: string; barcode: string | null; article: string; stock: number | null; priceArs: number };
+export type StoredPreview = { actorSessionHash: string; contentHash: string; baseCatalogVersion: number; expiresAt: number; rows: PreviewRow[] };
+const previews = new Map<string, StoredPreview>();
 
 function text(cell: ExcelJS.Cell, name: string, required = true) {
   if (cell.formula) throw invalid('Formulas are not allowed in XLSX imports.');
@@ -33,7 +36,7 @@ function parseRow(row: ExcelJS.Row): PreviewRow {
   return { code, barcode, article: text(row.getCell(3), 'Articulo'), stock: whole(row.getCell(4), 'Stock fisico', false), priceArs: whole(row.getCell(5), 'Precio')! };
 }
 
-export async function previewXlsx(sqlite: Database.Database, buffer: Buffer) {
+export async function previewXlsx(sqlite: Database.Database, buffer: Buffer, actorSessionHash: string) {
   await preflightXlsx(buffer);
   const workbook = new ExcelJS.Workbook();
   try { await workbook.xlsx.load(buffer as never); } catch { throw invalid('XLSX workbook could not be parsed.'); }
@@ -50,5 +53,18 @@ export async function previewXlsx(sqlite: Database.Database, buffer: Buffer) {
   }
   const existing = new Set((sqlite.prepare('SELECT code_key AS codeKey FROM products').all() as { codeKey: string }[]).map(({ codeKey }) => codeKey));
   const updates = rows.filter((row) => existing.has(normalizeSearchText(row.code))).length;
-  return { contentHash: createHash('sha256').update(buffer).digest('hex'), baseCatalogVersion: (sqlite.prepare('SELECT COALESCE(MAX(revision), 0) AS version FROM products').get() as { version: number }).version, diff: { creates: rows.length - updates, updates }, expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(), rows };
+  const expiresAt = Date.now() + 10 * 60_000;
+  const previewReference = crypto.randomUUID();
+  const stored = { actorSessionHash, contentHash: createHash('sha256').update(buffer).digest('hex'), baseCatalogVersion: getCatalogVersion(sqlite), expiresAt, rows };
+  previews.set(previewReference, stored);
+  return { previewReference, contentHash: stored.contentHash, baseCatalogVersion: stored.baseCatalogVersion, diff: { creates: rows.length - updates, updates }, expiresAt: new Date(expiresAt).toISOString(), rows };
 }
+
+export function getPreview(previewReference: string, actorSessionHash: string) {
+  const preview = previews.get(previewReference);
+  if (!preview || preview.actorSessionHash !== actorSessionHash) throw new HttpError(409, 'PREVIEW_NOT_FOUND', 'The import preview is no longer available.');
+  if (preview.expiresAt <= Date.now()) { previews.delete(previewReference); throw new HttpError(409, 'PREVIEW_EXPIRED', 'The import preview has expired.'); }
+  return preview;
+}
+
+export function removePreview(previewReference: string) { previews.delete(previewReference); }

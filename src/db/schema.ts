@@ -55,3 +55,18 @@ export const auditLog = sqliteTable('audit_log', {
   details: text('details').notNull(),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
 });
+
+export const catalogMetadata = sqliteTable('catalog_metadata', {
+  id: integer('id').primaryKey(),
+  catalogVersion: integer('catalog_version').notNull(),
+});
+
+export const importRuns = sqliteTable('import_runs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  actorSessionHash: text('actor_session_hash').notNull(),
+  contentHash: text('content_hash').notNull(),
+  baseCatalogVersion: integer('base_catalog_version').notNull(),
+  catalogVersion: integer('catalog_version').notNull(),
+  rowCount: integer('row_count').notNull(),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});

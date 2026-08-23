@@ -12,11 +12,13 @@
     "db:migrate": "tsx src/db/migrate.ts"
   },
   "dependencies": {
-    "@node-rs/argon2": "2.1.0",
     "@astrojs/node": "11.1.4",
+    "@node-rs/argon2": "2.1.0",
     "astro": "7.2.4",
     "better-sqlite3": "13.0.3",
-    "drizzle-orm": "0.45.2"
+    "drizzle-orm": "0.45.2",
+    "exceljs": "4.4.0",
+    "yauzl": "3.4.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "7.6.13",

@@ -80,7 +80,10 @@ describe('public manual lookup page', () => {
     expect(page).toContain('scan.disabled = false;');
     expect(page).toContain("scan.setAttribute('aria-pressed', 'false');");
     expect(page).toContain("if (outcome === 'matched') closeScanner(null, false)");
-    expect(page).toContain('input.value = text; const outcome = await lookup(text, true);');
+    expect(page).toContain('async function lookupScannedBarcode(text)');
+    expect(page).toContain("/^0[0-9]{13}$/.test(text)");
+    expect(page).toContain('const withoutLeadingZero = text.slice(1);');
+    expect(page).toContain("event: 'scanner-leading-zero-fallback'");
     expect(page).toContain("document.addEventListener('visibilitychange'");
     expect(page).toContain("window.addEventListener('pagehide'");
     expect(page).toContain('width: 100dvw; height: 100dvh;');

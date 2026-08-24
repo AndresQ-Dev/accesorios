@@ -140,8 +140,23 @@ def test_bounded_login_throttling_does_not_change_invalid_credential_response(
             headers={"Origin": ORIGIN}, base_url=ORIGIN,
         )
         statuses.append((response.status_code, response.get_json()["error"]["code"]))
-    assert statuses[:3] == [(401, "UNAUTHENTICATED")] * 3
+    assert statuses[:3] == [(401, "INVALID_APP_PASSWORD")] * 3
     assert statuses[3] == (429, "LOGIN_THROTTLED")
+
+
+def test_admin_login_reports_invalid_admin_password_without_session_expiry_confusion(
+    client: FlaskClient,
+    login_app: Callable[[], str],
+) -> None:
+    login_app()
+    response = client.post(
+        "/api/v1/admin/login",
+        json={"password": "wrong-admin-password"},
+        headers={"Origin": ORIGIN},
+        base_url=ORIGIN,
+    )
+    assert response.status_code == 401
+    assert response.get_json()["error"]["code"] == "INVALID_ADMIN_PASSWORD"
 
 
 def test_login_throttling_ignores_untrusted_forwarded_addresses(client: FlaskClient) -> None:

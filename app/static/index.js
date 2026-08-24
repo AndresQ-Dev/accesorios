@@ -99,6 +99,16 @@ async function lookup(query, decoded = false) {
   } finally { submit.disabled = false; result.setAttribute('aria-busy', 'false'); }
 }
 
+async function lookupScannedBarcode(text) {
+  input.value = text;
+  const outcome = await lookup(text, true);
+  if (outcome !== 'not-found' || !/^0[0-9]{13}$/.test(text)) return outcome;
+  const withoutLeadingZero = text.slice(1);
+  reportScannerDebug({ event: 'scanner-leading-zero-fallback', details: { originalLength: text.length, retryLength: withoutLeadingZero.length } });
+  input.value = withoutLeadingZero;
+  return lookup(withoutLeadingZero, true);
+}
+
 function scannerState(state) {
   const messages = {
     insecure: 'Para escanear con la cámara se requiere HTTPS. La búsqueda manual sigue disponible.',
@@ -119,7 +129,7 @@ const scanner = createBrowserScanner(camera, {
   onState: scannerState,
   onTorch: (available) => { torch.hidden = !available; },
   onDiagnostic: reportScannerDebug,
-  onDecode: async (text) => { input.value = text; const outcome = await lookup(text, true); if (outcome === 'matched') closeScanner(null, false); return outcome; },
+  onDecode: async (text) => { const outcome = await lookupScannedBarcode(text); if (outcome === 'matched') closeScanner(null, false); return outcome; },
 });
 
 function closeScanner(message = 'Escaneo cancelado. La búsqueda manual está lista.', restoreFocus = true) {

@@ -24,6 +24,8 @@ form.addEventListener('submit', async (event) => {
       const payload = await response.json().catch(() => ({}));
       const message = payload.error?.code === 'LOGIN_THROTTLED'
         ? 'Se alcanzó el límite de intentos. Espere unos minutos antes de volver a intentar.'
+        : payload.error?.code === 'INVALID_APP_PASSWORD'
+        ? 'La contraseña no coincide. Revise el acceso e intente nuevamente.'
         : 'No se pudo validar el acceso. Revise la contraseña e intente nuevamente.';
       throw new Error(message);
     }

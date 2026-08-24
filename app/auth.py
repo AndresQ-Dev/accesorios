@@ -153,8 +153,9 @@ def login(kind: SessionKind) -> tuple[dict[str, str], str, int]:
                 {"hash": token_hash(token), "csrf": csrf_token, "expires": _timestamp(expires_at)},
             )
     if not authenticated:
+        code = "INVALID_APP_PASSWORD" if kind == "app" else "INVALID_ADMIN_PASSWORD"
         message = "Invalid credentials." if kind == "app" else "Invalid administrator credentials."
-        raise ApiError(401, "UNAUTHENTICATED", message)
+        raise ApiError(401, code, message)
     return {"csrfToken": csrf_token}, token, current_app.config["SESSION_SECONDS"]
 
 

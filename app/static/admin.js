@@ -25,6 +25,8 @@ let busy = false;
 
 const spanishError = {
   INVALID_LOGIN: 'Ingresá la contraseña para continuar.',
+  INVALID_ADMIN_PASSWORD: 'La contraseña de administrador no coincide. Revisala e intentá nuevamente.',
+  INVALID_APP_PASSWORD: 'La contraseña de acceso no coincide. Volvé al ingreso principal.',
   UNAUTHENTICATED: 'La sesión no es válida o venció. Volvé a ingresar.',
   LOGIN_THROTTLED: 'Se alcanzó el límite de intentos. Esperá unos minutos antes de volver a intentar.',
   INVALID_ORIGIN: 'La solicitud debe realizarse desde esta misma aplicación.',

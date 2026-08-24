@@ -1,7 +1,29 @@
-# Local example catalog inputs; never commit shop data or product-label photos.
-SAN_JUAN_CASCOS.xlsx
+# Local catalog inputs; never commit shop data or product-label photos.
+*.xlsx
 ejemplo_barras.jpeg
+
+# Local AI/code intelligence metadata.
+.atl/
+.codegraph/
+
+# Local deployment data and secrets.
+*.env
+.env*
+secrets/
+backups/
+*.sqlite
+*.sqlite3
+*.db
 
 node_modules/
 dist/
 data/
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+__pycache__/
+*.py[cod]
+*.egg-info/

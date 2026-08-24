@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#14213D">
+    <meta name="robots" content="noindex, nofollow, noarchive">
+    <meta name="application-name" content="Accesorios">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Accesorios">
+    <title>Ingresar · Accesorios</title>
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" sizes="any">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+    <script type="module" src="{{ url_for('static', filename='pwa.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='login.js') }}"></script>
+  </head>
+  <body>
+    <main class="auth-shell">
+      <header class="admin-header">
+        <p class="section-label">Consulta privada</p>
+        <h1>Accesorios</h1>
+        <p class="intro">Ingrese para consultar el catálogo desde este dispositivo.</p>
+      </header>
+      <section class="workspace" aria-labelledby="login-title">
+        <section class="panel">
+          <div class="panel-heading">
+            <p class="step">Acceso</p>
+            <h2 id="login-title">Ingresar a la aplicación</h2>
+          </div>
+          <form id="app-login-form">
+            <label for="app-password">Contraseña</label>
+            <input id="app-password" name="password" type="password" autocomplete="current-password" required autofocus>
+            <button id="app-login-submit" class="button primary" type="submit">Ingresar</button>
+          </form>
+        </section>
+        <p id="login-status" class="status" role="status" aria-live="polite" aria-atomic="true" tabindex="-1" hidden></p>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#14213D">
+    <meta name="robots" content="noindex, nofollow, noarchive">
+    <meta name="application-name" content="Accesorios">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Accesorios">
+    <title>Accesorios</title>
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" sizes="any">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='index.css') }}">
+    <script type="module" src="{{ url_for('static', filename='pwa.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='index.js') }}"></script>
+  </head>
+  <body>
+    <main>
+      <div class="lookup-stage">
+        <div class="lookup-controls">
+          <form id="lookup-form" novalidate>
+            <label class="sr-only" for="query">Código o artículo</label>
+            <input id="query" name="query" type="search" inputmode="text" autocomplete="off" enterkeyhint="search" placeholder="Ingrese un código o artículo">
+            <button class="search-submit" type="submit" aria-label="Buscar precio">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 19.6-5.1-5.1a7.5 7.5 0 1 0-1.4 1.4l5.1 5.1 1.4-1.4ZM4.5 10a5.5 5.5 0 1 1 11 0 5.5 5.5 0 0 1-11 0Z"></path></svg>
+            </button>
+          </form>
+          <div class="scan-launch">
+            <button class="scan" id="scan" type="button" aria-label="Abrir escáner de código de barras" aria-controls="scanner" aria-haspopup="dialog" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8.35 5.25 9.55 3.6h4.9l1.2 1.65h2.1A3.25 3.25 0 0 1 21 8.5v7.25A3.25 3.25 0 0 1 17.75 19h-11.5A3.25 3.25 0 0 1 3 15.75V8.5a3.25 3.25 0 0 1 3.25-3.25h2.1Zm3.65 3a4.65 4.65 0 1 0 0 9.3 4.65 4.65 0 0 0 0-9.3Zm0 1.85a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6Zm5.95-1.25a.9.9 0 1 0 0 1.8.9.9 0 0 0 0-1.8Z"></path></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      <dialog class="scanner" id="scanner" aria-modal="true" aria-labelledby="scanner-title" aria-describedby="scanner-status">
+        <div class="scanner-header">
+          <h2 id="scanner-title">Escanear código de barras</h2>
+          <button class="icon-button close-scanner" id="cancel-scan" type="button" aria-label="Cerrar escáner de código de barras">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m6.7 5.3 12 12-1.4 1.4-12-12 1.4-1.4Zm12 1.4-12 12-1.4-1.4 12-12 1.4 1.4Z"></path></svg>
+          </button>
+        </div>
+        <div class="scan-band"><video id="camera" autoplay muted playsinline></video></div>
+        <div class="scanner-footer">
+          <p id="scanner-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true">Iniciando cámara…</p>
+          <button id="torch" type="button" aria-pressed="false" hidden>Encender luz</button>
+        </div>
+      </dialog>
+      <section id="status" class="status" aria-live="polite" aria-atomic="true" role="status" hidden></section>
+      <section id="scan-debug" class="scan-debug" aria-label="Diagnóstico del escáner" hidden>
+        <h2>DEBUG SCANNER v1</h2>
+        <ol></ol>
+      </section>
+      <article id="result" class="result" aria-busy="false" hidden></article>
+    </main>
+  </body>
+</html>

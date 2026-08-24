@@ -2,26 +2,123 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const pagePath = resolve(process.cwd(), 'src/pages/index.astro');
+const publicSurface = async () => [
+  await readFile(resolve(process.cwd(), 'app/templates/index.html'), 'utf8'),
+  await readFile(resolve(process.cwd(), 'app/static/index.css'), 'utf8'),
+  await readFile(resolve(process.cwd(), 'app/static/index.js'), 'utf8'),
+].join('\n');
 
 describe('public manual lookup page', () => {
-  it('provides an accessible manual search and recovery states', async () => {
-    const page = await readFile(pagePath, 'utf8');
+  it('keeps manual lookup attached with Enter submission plus recovery states', async () => {
+    const page = await publicSurface();
 
     expect(page).toContain('<form');
     expect(page).toContain('aria-live="polite"');
     expect(page).toContain('name="query"');
+    expect(page).toContain('enterkeyhint="search"');
+    expect(page).toContain("form.addEventListener('submit'");
+    expect(page).not.toContain('<header>');
+    expect(page).toContain('<button class="search-submit" type="submit" aria-label="Buscar precio">');
+    expect(page).toContain('<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 19.6-5.1-5.1');
+    expect(page).toContain('class="sr-only" for="query">Código o artículo</label>');
+    expect(page).toContain('placeholder="Ingrese un código o artículo"');
+    expect(page).toContain('form { display: flex; padding: 0; }');
+    expect(page).toContain('.search-submit { display: grid; flex: 0 0 3.5rem; width: 3.5rem; min-width: 3.5rem; height: 3.5rem; min-height: 3.5rem;');
+    expect(page).toContain('.search-submit svg { display: block; width: 1.375rem; height: 1.375rem; fill: currentColor; }');
+    expect(page).toContain(':focus-visible');
+    expect(page).toContain('.search-submit:active');
+    expect(page).toContain('.search-submit:disabled');
     expect(page).toContain('/api/v1/search');
     expect(page).toContain('formatArs');
-    expect(page).toContain('item.brand');
+    expect(page).not.toContain('item.brand');
     expect(page).toContain('item.article');
-    expect(page).toContain('item.category');
+    expect(page).not.toContain('item.category');
     expect(page).toContain('item.code');
+    expect(page).toContain("if (value === null) return 'Sin precio'");
     expect(page).toContain('response.status === 400');
-    expect(page).toContain('No matching price was found');
-    expect(page).toContain('Unable to check the price right now');
-    expect(page).toContain('Barcode decoded, but no matching price was found');
-    expect(page).toContain('cancel-scan');
-    expect(page).toContain('Camera scanning needs HTTPS');
+    expect(page).toContain('Consultando el precio actual…');
+    expect(page).toContain('No se encontró un precio coincidente. Verifique el código o pruebe con otro artículo.');
+    expect(page).toContain('No se puede consultar el precio en este momento. Verifique la conexión e inténtelo nuevamente.');
+    expect(page).toContain('No se encontró un precio coincidente. Continúe escaneando o busque manualmente.');
+    expect(page).toContain("'catalog-miss'");
+    expect(page).toContain('id="cancel-scan"');
+    expect(page).toContain('Para escanear con la cámara se requiere HTTPS. La búsqueda manual sigue disponible.');
+    expect(page).toContain('Escaneo cancelado. La búsqueda manual está lista.');
+    expect(page).toContain("on ? 'Apagar luz' : 'Encender luz'");
+  });
+
+  it('centers the idle search and scanner controls in the safe dynamic viewport while output can flow below', async () => {
+    const page = await publicSurface();
+
+    expect(page).toContain('<div class="lookup-stage">');
+    expect(page).toContain('<div class="lookup-controls">');
+    expect(page).toMatch(/main \{[^}]*grid-template-rows: auto auto auto 1fr;[^}]*min-height: 100dvh;[^}]*scroll-padding-block:/);
+    expect(page).toContain('.lookup-stage { display: grid; min-height: clamp(12rem, 32svh, 17rem); align-items: end; justify-items: center; }');
+    expect(page).toContain('.lookup-controls { display: grid; width: min(100%, 34rem); gap: clamp(2.75rem, 7svh, 4rem); justify-items: center; }');
+    expect(page).toContain('.scan-launch { display: grid; place-items: center; }');
+    expect(page).toContain('.scan { width: 6rem; min-width: 6rem; min-height: 6rem; border-radius: 50%; }');
+    expect(page).toContain('.scan svg { width: 4.35rem; height: 4.35rem; fill: currentColor; transform: translateY(.18rem); }');
+    expect(page.indexOf('id="status"')).toBeGreaterThan(page.indexOf('<div class="lookup-stage">'));
+    expect(page.indexOf('id="result"')).toBeGreaterThan(page.indexOf('id="status"'));
+  });
+
+  it('keeps the scanner closed until its reachable trigger opens it, then restores the trigger when closed', async () => {
+    const page = await publicSurface();
+
+    expect(page).toContain('id="scan" type="button" aria-label="Abrir escáner de código de barras"');
+    expect(page).toContain('<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">');
+    expect(page).toContain('aria-haspopup="dialog"');
+    expect(page).toContain('aria-pressed="false"');
+    expect(page).toContain('<dialog class="scanner" id="scanner" aria-modal="true" aria-labelledby="scanner-title"');
+    expect(page).not.toMatch(/<dialog[^>]*\bid="scanner"[^>]*\bopen(?:\s|=|>)/);
+    expect(page).toContain('scannerPanel.showModal()');
+    expect(page).toContain('.scanner:not([open]) { display: none; }');
+    expect(page).toContain('.scanner[open] { display: grid;');
+    expect(page).toContain("scannerPanel.addEventListener('cancel'");
+    expect(page).toContain("cancelScan.addEventListener('click', () => closeScanner())");
+    expect(page).toContain('scanner.stop();');
+    expect(page).toContain('scan.disabled = false;');
+    expect(page).toContain("scan.setAttribute('aria-pressed', 'false');");
+    expect(page).toContain("if (outcome === 'matched') closeScanner(null, false)");
+    expect(page).toContain('input.value = text; const outcome = await lookup(text, true);');
+    expect(page).toContain("document.addEventListener('visibilitychange'");
+    expect(page).toContain("window.addEventListener('pagehide'");
+    expect(page).toContain('width: 100dvw; height: 100dvh;');
+    expect(page).toContain('max-width: none; max-height: none; margin: 0; padding: 0;');
+    expect(page).toContain('.scan-launch { display: grid; place-items: center; }');
+    expect(page).toContain('.scan-band::before');
+    expect(page).toContain('scanBand.dataset.loading = \'true\';');
+    expect(page).toContain("camera.addEventListener('loadeddata'");
+    expect(page).toContain('object-fit: cover;');
+    expect(page).not.toContain('box-shadow: 0 0 0 100vmax');
+    expect(page).toContain('env(safe-area-inset-bottom)');
+    expect(page).toContain('aria-describedby="scanner-status"');
+    expect(page).toContain('id="scanner-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"');
+    expect(page).not.toContain('id="scanner-guide"');
+    expect(page).not.toContain('Mantenga el código de barras dentro de la banda.');
+    expect(page).not.toContain('#scanner-status {');
+  });
+
+  it('keeps status and results out of the initial public screen until they are relevant', async () => {
+    const page = await publicSurface();
+
+    expect(page).toContain('id="status" class="status" aria-live="polite" aria-atomic="true" role="status" hidden');
+    expect(page).toContain('status.hidden = false;');
+    expect(page).toContain('<article id="result" class="result" aria-busy="false" hidden></article>');
+    expect(page).not.toContain('Enter a code or article to see the current price.');
+  });
+
+  it('renders every ranked API result in an accessible ordered list', async () => {
+    const page = await publicSurface();
+
+    expect(page).toContain('function showResults(items');
+    expect(page).toContain('for (const item of items)');
+    expect(page).toContain("document.createElement('ol')");
+    expect(page).toContain("'aria-label', 'Resultados de búsqueda ordenados'");
+    expect(page).toContain("items.length === 1 ? 'precio encontrado' : 'precios encontrados'");
+    expect(page).toContain("toLocaleString('es-AR')");
+    expect(page).toContain('No hay información sobre la actualización del catálogo');
+    expect(page).toContain('showResults(data.results, data.freshness)');
+    expect(page).not.toContain('data.results[0]');
   });
 });

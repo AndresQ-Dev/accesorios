@@ -1,0 +1,20 @@
+import { readFile } from 'node:fs/promises';
+import { describe, expect, it } from 'vitest';
+
+const page = [
+  await readFile(new URL('../../app/templates/index.html', import.meta.url), 'utf8'),
+  await readFile(new URL('../../app/static/index.css', import.meta.url), 'utf8'),
+].join('\n');
+
+describe('scanner guide layout', () => {
+  it('keeps the 6rem circular trigger while giving its camera icon a balanced inset', () => {
+    expect(page).toMatch(/\.scan \{[^}]*width: 6rem;[^}]*min-width: 6rem;[^}]*min-height: 6rem;[^}]*border-radius: 50%;/);
+    expect(page).toMatch(/\.scan svg \{[^}]*width: 4\.35rem;[^}]*height: 4\.35rem;/);
+  });
+
+  it('centers the instructional guide as an overlay over the video viewport', () => {
+    expect(page).toContain('<div class="scan-band"><video id="camera" autoplay muted playsinline></video></div>');
+    expect(page).toMatch(/\.scan-band \{[^}]*position: relative;/);
+    expect(page).toMatch(/\.scan-band::after \{[^}]*position: absolute;[^}]*top: 50%;[^}]*left: 50%;[^}]*width: 84%;[^}]*transform: translate\(-50%, -50%\);/);
+  });
+});

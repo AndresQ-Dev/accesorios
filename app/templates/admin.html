@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#14213D">
+    <meta name="robots" content="noindex, nofollow, noarchive">
+    <meta name="application-name" content="Accesorios">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Accesorios">
+    <title>Administración · Importar catálogo</title>
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" sizes="any">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+    <script type="module" src="{{ url_for('static', filename='pwa.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='admin.js') }}"></script>
+  </head>
+  <body>
+    <main class="admin-shell">
+      <header class="admin-header">
+        <a class="back-link" href="/">Accesorios</a>
+        <p class="section-label">Administración</p>
+        <h1>Importar catálogo</h1>
+        <p class="intro">Revisá el resumen antes de confirmar cambios en el catálogo.</p>
+      </header>
+      <section class="workspace" aria-labelledby="admin-title">
+        <h2 id="admin-title" class="sr-only">Importación de catálogo</h2>
+        <section id="login-panel" class="panel" aria-labelledby="login-title">
+          <div class="panel-heading"><p class="step">Acceso</p><h2 id="login-title">Ingresar como administrador</h2></div>
+          <form id="login-form">
+            <label for="password">Contraseña</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required>
+            <button id="login-submit" class="button primary" type="submit">Ingresar</button>
+          </form>
+        </section>
+        <section id="import-panel" class="panel" aria-labelledby="import-title" hidden>
+          <div class="panel-heading">
+            <p class="step">Archivo</p><h2 id="import-title">Preparar importación</h2>
+            <p>Elegí un archivo XLSX aprobado. La vista previa no modifica el catálogo.</p>
+          </div>
+          <form id="preview-form">
+            <label class="file-field" for="xlsx-file"><span>Archivo XLSX</span><input id="xlsx-file" name="xlsx-file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required></label>
+            <p id="file-name" class="file-name">No se seleccionó ningún archivo.</p>
+            <button id="preview-submit" class="button primary" type="submit" disabled>Generar vista previa</button>
+          </form>
+          <section id="preview-summary" class="preview" aria-labelledby="preview-title" hidden>
+            <div class="preview-heading"><div><p class="step">Vista previa</p><h3 id="preview-title">Cambios preparados</h3></div><span class="non-mutating">Sin cambios todavía</span></div>
+            <dl class="summary-list">
+              <div><dt>Filas de origen</dt><dd id="summary-rows">—</dd></div>
+              <div><dt>Altas</dt><dd id="summary-creates">—</dd></div>
+              <div><dt>Actualizaciones</dt><dd id="summary-updates">—</dd></div>
+              <div><dt>Versión base</dt><dd id="summary-version">—</dd></div>
+              <div><dt>Vence</dt><dd id="summary-expiry">—</dd></div>
+            </dl>
+            <div class="confirmation"><p>La confirmación es irreversible y aplica únicamente este resumen.</p><button id="confirm-import" class="button danger" type="button" disabled>Confirmar importación irreversible</button></div>
+          </section>
+          <section id="success-summary" class="success" aria-labelledby="success-title" hidden>
+            <p class="step">Importación confirmada</p><h3 id="success-title">Catálogo actualizado</h3>
+            <p id="success-details"></p><button id="new-import" class="button secondary" type="button">Preparar otro archivo</button>
+          </section>
+        </section>
+        <p id="admin-status" class="status" role="status" aria-live="polite" aria-atomic="true" tabindex="-1" hidden></p>
+      </section>
+    </main>
+  </body>
+</html>

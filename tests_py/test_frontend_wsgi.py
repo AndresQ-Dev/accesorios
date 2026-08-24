@@ -10,6 +10,7 @@ from tests_py.conftest import ORIGIN
 def test_jinja_pages_preserve_accessible_lookup_admin_and_login_surfaces(
     client: FlaskClient,
     login_app: Callable[[], str],
+    login_admin: Callable[[], str],
 ) -> None:
     login = client.get("/login", base_url=ORIGIN)
     assert login.status_code == 200
@@ -26,6 +27,11 @@ def test_jinja_pages_preserve_accessible_lookup_admin_and_login_surfaces(
     assert b'apple-mobile-web-app-capable' in lookup.data
     admin = client.get("/admin", base_url=ORIGIN)
     assert b'id="login-panel"' in admin.data
+    assert b'id="preview-form"' not in admin.data
+    assert b'Confirmar importaci' not in admin.data
+    login_admin()
+    admin = client.get("/admin", base_url=ORIGIN)
+    assert b'id="login-panel" class="panel" aria-labelledby="login-title" hidden' in admin.data
     assert b'id="preview-form"' in admin.data
     assert b'Confirmar importaci' in admin.data
     assert b'/static/manifest.webmanifest' in admin.data

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#14213D">
     <meta name="robots" content="noindex, nofollow, noarchive">
+    <meta name="admin-csrf-token" content="{{ admin_csrf_token }}">
     <meta name="application-name" content="Accesorios">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -28,7 +29,7 @@
       </header>
       <section class="workspace" aria-labelledby="admin-title">
         <h2 id="admin-title" class="sr-only">Importación de catálogo</h2>
-        <section id="login-panel" class="panel" aria-labelledby="login-title">
+        <section id="login-panel" class="panel" aria-labelledby="login-title"{% if admin_authenticated %} hidden{% endif %}>
           <div class="panel-heading"><p class="step">Acceso</p><h2 id="login-title">Ingresar como administrador</h2></div>
           <form id="login-form">
             <label for="password">Contraseña</label>
@@ -36,7 +37,8 @@
             <button id="login-submit" class="button primary" type="submit">Ingresar</button>
           </form>
         </section>
-        <section id="import-panel" class="panel" aria-labelledby="import-title" hidden>
+        {% if admin_authenticated %}
+        <section id="import-panel" class="panel" aria-labelledby="import-title">
           <div class="panel-heading">
             <p class="step">Archivo</p><h2 id="import-title">Preparar importación</h2>
             <p>Elegí un archivo XLSX aprobado. La vista previa no modifica el catálogo.</p>
@@ -62,6 +64,7 @@
             <p id="success-details"></p><button id="new-import" class="button secondary" type="button">Preparar otro archivo</button>
           </section>
         </section>
+        {% endif %}
         <p id="admin-status" class="status" role="status" aria-live="polite" aria-atomic="true" tabindex="-1" hidden></p>
       </section>
     </main>

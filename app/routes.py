@@ -4,7 +4,14 @@ import json
 
 from flask import Blueprint, Response, current_app, jsonify, redirect, render_template, request, url_for
 
-from app.auth import login, read_json_payload, require_admin, require_app, set_session_cookie
+from app.auth import (
+    login,
+    read_json_payload,
+    require_admin,
+    require_admin_session,
+    require_app,
+    set_session_cookie,
+)
 from app.catalog import add_category, edit_product, list_categories, patch_category
 from app.db import read_connection, write_connection
 from app.errors import ApiError
@@ -43,7 +50,15 @@ def admin_page():  # type: ignore[no-untyped-def]
         require_app()
     except ApiError:
         return redirect(url_for("pages.login_page", next=request.path))
-    return render_template("admin.html")
+    try:
+        admin_session = require_admin_session(csrf=False)
+    except ApiError:
+        return render_template("admin.html", admin_authenticated=False, admin_csrf_token="")
+    return render_template(
+        "admin.html",
+        admin_authenticated=True,
+        admin_csrf_token=admin_session["csrfToken"],
+    )
 
 
 @api.post("/login")

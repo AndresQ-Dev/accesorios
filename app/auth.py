@@ -199,11 +199,16 @@ def require_app(*, csrf: bool = False) -> str:
     return session["tokenHash"]
 
 
-def require_admin(*, csrf: bool = True) -> str:
+def require_admin_session(*, csrf: bool = True) -> dict[str, str]:
     require_app(csrf=False)
     session = _session("admin")
     if csrf:
         _validate_request_security(session["csrfToken"])
+    return session
+
+
+def require_admin(*, csrf: bool = True) -> str:
+    session = require_admin_session(csrf=csrf)
     return session["tokenHash"]
 
 

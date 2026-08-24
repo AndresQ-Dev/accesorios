@@ -9,7 +9,8 @@ const page = [
 describe('admin XLSX import route', () => {
   it('keeps credentials and the CSRF token out of the rendered surface', () => {
     expect(page).toContain('type="password"');
-    expect(page).toContain('let csrfToken = null;');
+    expect(page).toContain('csrfMeta?.content || null');
+    expect(page).toContain('{% if admin_authenticated %}');
     expect(page).not.toMatch(/localStorage|sessionStorage|console\.(log|info|warn|error)/);
   });
 
@@ -29,8 +30,8 @@ describe('admin XLSX import route', () => {
     expect(page).toContain('id="summary-expiry"');
     expect(page).toContain('id="confirm-import"');
     expect(page).toContain('Confirmar importación irreversible');
-    expect(page).toMatch(/confirmButton\.addEventListener\('click'/);
-    const previewFlow = page.split("previewForm.addEventListener('submit'")[1].split("confirmButton.addEventListener('click'")[0];
+    expect(page).toMatch(/confirmButton\?\.addEventListener\('click'/);
+    const previewFlow = page.split("previewForm?.addEventListener('submit'")[1].split("confirmButton?.addEventListener('click'")[0];
     expect(previewFlow).not.toContain('/api/v1/admin/import/confirm');
   });
 

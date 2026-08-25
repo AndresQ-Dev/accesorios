@@ -122,7 +122,9 @@ describe('public manual lookup page', () => {
     expect(page).toContain("document.createElement('ol')");
     expect(page).toContain("'aria-label', 'Resultados de búsqueda ordenados'");
     expect(page).toContain("items.length === 1 ? 'precio encontrado' : 'precios encontrados'");
-    expect(page).toContain("toLocaleString('es-AR')");
+    expect(page).toContain("new Intl.DateTimeFormat('es-AR'");
+    expect(page).toContain("timeZone: 'America/Argentina/Buenos_Aires'");
+    expect(page).toContain('Última actualización:');
     expect(page).toContain('No hay información sobre la actualización del catálogo');
     expect(page).toContain('showResults(data.results, data.freshness)');
     expect(page).not.toContain('data.results[0]');

@@ -26,6 +26,20 @@ function formatArs(value) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
 }
 
+function formatArgentinaDateTime(value) {
+  const source = typeof value === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(value)
+    ? `${value.replace(' ', 'T')}Z`
+    : value;
+  const date = new Date(source);
+  if (Number.isNaN(date.valueOf())) return 'fecha no disponible';
+  const formatted = new Intl.DateTimeFormat('es-AR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+    timeZone: 'America/Argentina/Buenos_Aires',
+  }).format(date);
+  return `${formatted.replace(',', '')} hs`;
+}
+
 function setStatus(message, tone = 'info') {
   if (!status.hidden && status.textContent === message && status.dataset.tone === tone) return;
   status.textContent = message;
@@ -55,7 +69,7 @@ function showResults(items, freshness) {
     list.append(listItem);
   }
   const updated = document.createElement('p'); updated.className = 'freshness';
-  updated.textContent = freshness ? `Catálogo actualizado el ${new Date(freshness).toLocaleString('es-AR')}` : 'No hay información sobre la actualización del catálogo';
+  updated.textContent = freshness ? `Última actualización: ${formatArgentinaDateTime(freshness)}` : 'No hay información sobre la actualización del catálogo';
   result.dataset.loading = 'false'; result.setAttribute('aria-busy', 'false'); result.replaceChildren(heading, list, updated);
   setStatus(`${items.length} ${items.length === 1 ? 'precio encontrado' : 'precios encontrados'}.`, 'success');
 }

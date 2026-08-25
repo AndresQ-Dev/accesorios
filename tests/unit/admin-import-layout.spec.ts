@@ -28,6 +28,8 @@ describe('admin XLSX import route', () => {
     expect(page).toContain('id="summary-updates"');
     expect(page).toContain('id="summary-version"');
     expect(page).toContain('id="summary-expiry"');
+    expect(page).toContain("timeZone: 'America/Argentina/Buenos_Aires'");
+    expect(page).toContain('formatArgentinaDateTime(payload.expiresAt)');
     expect(page).toContain('id="confirm-import"');
     expect(page).toContain('Confirmar importación irreversible');
     expect(page).toMatch(/confirmButton\?\.addEventListener\('click'/);

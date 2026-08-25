@@ -73,6 +73,20 @@ function returnToLogin(message) {
 }
 function invalidPreview(code) { return ['PREVIEW_NOT_FOUND', 'PREVIEW_EXPIRED', 'PREVIEW_MISMATCH', 'REVISION_CONFLICT', 'INVALID_CONFIRMATION'].includes(code); }
 
+function formatArgentinaDateTime(value) {
+  const source = typeof value === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(value)
+    ? `${value.replace(' ', 'T')}Z`
+    : value;
+  const date = new Date(source);
+  if (Number.isNaN(date.valueOf())) return 'fecha no disponible';
+  const formatted = new Intl.DateTimeFormat('es-AR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+    timeZone: 'America/Argentina/Buenos_Aires',
+  }).format(date);
+  return `${formatted.replace(',', '')} hs`;
+}
+
 loginForm.addEventListener('submit', async (event) => {
   event.preventDefault(); if (busy) return; setBusy(true); showStatus('Verificando acceso…');
   try {
@@ -105,7 +119,7 @@ previewForm?.addEventListener('submit', async (event) => {
     if (!payload.previewReference || !payload.contentHash || !Number.isInteger(payload.baseCatalogVersion) || !Array.isArray(payload.rows)) throw new Error('La respuesta de la vista previa no es válida. Seleccioná el archivo nuevamente.');
     preview = payload; rows.textContent = String(payload.rows.length); creates.textContent = String(payload.diff.creates);
     updates.textContent = String(payload.diff.updates); version.textContent = String(payload.baseCatalogVersion);
-    expiry.textContent = new Date(payload.expiresAt).toLocaleString('es-AR'); previewSummary.hidden = false;
+    expiry.textContent = formatArgentinaDateTime(payload.expiresAt); previewSummary.hidden = false;
     showStatus('Vista previa lista. Revisá el resumen antes de confirmar.', 'success'); confirmButton.focus();
   } catch (error) { showStatus(error instanceof Error ? error.message : 'No se pudo generar la vista previa.', 'error'); fileInput.focus(); }
   finally { setBusy(false); }

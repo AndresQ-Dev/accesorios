@@ -45,6 +45,46 @@ def seed_existing(db: sqlite3.Connection) -> None:
     db.commit()
 
 
+def test_preview_and_confirmation_count_only_real_product_changes(
+    client: FlaskClient,
+    db: sqlite3.Connection,
+    login_admin: Callable[[], str],
+    workbook_bytes: Callable[[list[list[object]], list[str] | None], bytes],
+) -> None:
+    db.executemany(
+        """INSERT INTO products
+        (code, code_key, barcode, article, article_key, stock, price_ars, revision, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        [
+            ("A1", "a1", "111", "Casco sin cambios", "casco sin cambios", 2, 100, 4, "2026-01-01 10:00:00"),
+            ("B2", "b2", "222", "Casco con cambio", "casco con cambio", 3, 200, 5, "2026-01-01 10:00:00"),
+        ],
+    )
+    db.execute("UPDATE catalog_metadata SET catalog_version = 5 WHERE id = 1")
+    db.commit()
+    csrf = login_admin()
+
+    response = preview(client, csrf, workbook_bytes([
+        ["A1", "111", "Casco sin cambios", 2, 100],
+        ["B2", "222", "Casco con cambio", 3, 250],
+    ]))
+
+    assert response.status_code == 200
+    token = response.get_json()
+    assert token["diff"] == {"creates": 0, "updates": 1}
+    confirmed = confirm(client, csrf, token)
+    assert confirmed.status_code == 200
+    assert confirmed.get_json() == {"catalogVersion": 6, "creates": 0, "updates": 1}
+    rows = db.execute(
+        "SELECT code_key, price_ars, revision, updated_at FROM products ORDER BY code_key"
+    ).fetchall()
+    assert tuple(rows[0]) == ("a1", 100, 4, "2026-01-01 10:00:00")
+    assert rows[1]["code_key"] == "b2"
+    assert rows[1]["price_ars"] == 250
+    assert rows[1]["revision"] == 6
+    assert rows[1]["updated_at"] != "2026-01-01 10:00:00"
+
+
 def test_preview_is_persistent_session_bound_and_confirmation_is_atomic(
     app: Flask,
     client: FlaskClient,

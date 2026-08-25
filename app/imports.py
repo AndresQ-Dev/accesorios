@@ -166,8 +166,15 @@ def preview_xlsx(buffer: bytes, actor_hash: str) -> dict[str, Any]:
             text("DELETE FROM import_previews WHERE expires_at <= :now"),
             {"now": _timestamp(datetime.now(UTC))},
         )
-        existing = set(connection.execute(text("SELECT code_key FROM products")).scalars())
-        updates = sum(normalize_search_text(row["code"]) in existing for row in rows)
+        existing = _existing_products_by_code(connection)
+        creates = 0
+        updates = 0
+        for row in rows:
+            product = existing.get(normalize_search_text(row["code"]))
+            if product is None:
+                creates += 1
+            elif _product_has_import_changes(product, row):
+                updates += 1
         expires_at = datetime.now(UTC) + timedelta(seconds=current_app.config["PREVIEW_SECONDS"])
         reference = str(uuid4())
         content_hash = hashlib.sha256(buffer).hexdigest()
@@ -191,7 +198,7 @@ def preview_xlsx(buffer: bytes, actor_hash: str) -> dict[str, Any]:
         "previewReference": reference,
         "contentHash": content_hash,
         "baseCatalogVersion": base_version,
-        "diff": {"creates": len(rows) - updates, "updates": updates},
+        "diff": {"creates": creates, "updates": updates},
         "expiresAt": _timestamp(expires_at),
         "rows": rows,
     }
@@ -243,6 +250,28 @@ def _parse_confirmation(payload: Any) -> dict[str, Any]:
     return payload
 
 
+def _existing_products_by_code(connection: Connection) -> dict[str, dict[str, Any]]:
+    return {
+        row["codeKey"]: dict(row)
+        for row in connection.execute(
+            text(
+                "SELECT id, code, code_key AS codeKey, barcode, article, stock, "
+                "price_ars AS priceArs FROM products"
+            )
+        ).mappings()
+    }
+
+
+def _product_has_import_changes(product: dict[str, Any], row: dict[str, Any]) -> bool:
+    return any((
+        product["code"] != row["code"],
+        product["barcode"] != row["barcode"],
+        product["article"] != row["article"],
+        product["stock"] != row["stock"],
+        product["priceArs"] != row["priceArs"],
+    ))
+
+
 def _assert_barcode_collisions(connection: Connection, rows: list[dict[str, Any]]) -> None:
     products = [dict(row) for row in connection.execute(
         text("SELECT id, code_key AS codeKey, barcode FROM products")
@@ -284,25 +313,25 @@ def confirm_xlsx(payload: Any, actor_hash: str) -> dict[str, int]:
         _assert_barcode_collisions(connection, preview["rows"])
         creates = 0
         updates = 0
+        existing = _existing_products_by_code(connection)
         for row in preview["rows"]:
             code_key = normalize_search_text(row["code"])
-            product_id = connection.execute(
-                text("SELECT id FROM products WHERE code_key = :key"), {"key": code_key}
-            ).scalar_one_or_none()
-            if product_id is not None:
-                connection.execute(
-                    text(
-                        "UPDATE products SET code = :code, barcode = :barcode, article = :article, "
-                        "article_key = :article_key, stock = :stock, price_ars = :price, "
-                        "revision = revision + 1, updated_at = CURRENT_TIMESTAMP WHERE id = :id"
-                    ),
-                    {
-                        "code": row["code"], "barcode": row["barcode"], "article": row["article"],
-                        "article_key": normalize_search_text(row["article"]), "stock": row["stock"],
-                        "price": row["priceArs"], "id": product_id,
-                    },
-                )
-                updates += 1
+            product = existing.get(code_key)
+            if product is not None:
+                if _product_has_import_changes(product, row):
+                    connection.execute(
+                        text(
+                            "UPDATE products SET code = :code, barcode = :barcode, article = :article, "
+                            "article_key = :article_key, stock = :stock, price_ars = :price, "
+                            "revision = revision + 1, updated_at = CURRENT_TIMESTAMP WHERE id = :id"
+                        ),
+                        {
+                            "code": row["code"], "barcode": row["barcode"], "article": row["article"],
+                            "article_key": normalize_search_text(row["article"]), "stock": row["stock"],
+                            "price": row["priceArs"], "id": product["id"],
+                        },
+                    )
+                    updates += 1
             else:
                 connection.execute(
                     text(
@@ -325,7 +354,9 @@ def confirm_xlsx(payload: Any, actor_hash: str) -> dict[str, int]:
                     raise ApiError(
                         409, "BARCODE_COLLISION", "The verified barcode alias belongs to another product."
                     ) from None
-        new_version = preview["baseCatalogVersion"] + 1
+        new_version = (
+            preview["baseCatalogVersion"] + 1 if creates or updates else preview["baseCatalogVersion"]
+        )
         connection.execute(
             text("UPDATE catalog_metadata SET catalog_version = :version WHERE id = 1"),
             {"version": new_version},

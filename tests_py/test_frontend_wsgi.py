@@ -16,6 +16,9 @@ def test_jinja_pages_preserve_accessible_lookup_admin_and_login_surfaces(
     assert login.status_code == 200
     assert b'id="app-login-form"' in login.data
     assert b'autocomplete="current-password"' in login.data
+    assert b'Ingreso a la app' in login.data
+    assert b'Consulta privada' not in login.data
+    assert b'Ingrese para consultar' not in login.data
     login_app()
     lookup = client.get("/", base_url=ORIGIN)
     assert b'id="lookup-form"' in lookup.data

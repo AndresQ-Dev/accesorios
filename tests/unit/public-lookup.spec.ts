@@ -21,7 +21,7 @@ describe('public manual lookup page', () => {
     expect(page).toContain('<button class="search-submit" type="submit" aria-label="Buscar precio">');
     expect(page).toContain('<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 19.6-5.1-5.1');
     expect(page).toContain('class="sr-only" for="query">Código o artículo</label>');
-    expect(page).toContain('placeholder="Ingrese un código o artículo"');
+    expect(page).toContain('placeholder="Código o artículo"');
     expect(page).toContain('form { display: flex; padding: 0; }');
     expect(page).toContain('.search-submit { display: grid; flex: 0 0 3.5rem; width: 3.5rem; min-width: 3.5rem; height: 3.5rem; min-height: 3.5rem;');
     expect(page).toContain('.search-submit svg { display: block; width: 1.375rem; height: 1.375rem; fill: currentColor; }');
@@ -36,14 +36,14 @@ describe('public manual lookup page', () => {
     expect(page).toContain('item.code');
     expect(page).toContain("if (value === null) return 'Sin precio'");
     expect(page).toContain('response.status === 400');
-    expect(page).toContain('Consultando el precio actual…');
-    expect(page).toContain('No se encontró un precio coincidente. Verifique el código o pruebe con otro artículo.');
-    expect(page).toContain('No se puede consultar el precio en este momento. Verifique la conexión e inténtelo nuevamente.');
-    expect(page).toContain('No se encontró un precio coincidente. Continúe escaneando o busque manualmente.');
+    expect(page).toContain('Buscando…');
+    expect(page).toContain('No hay resultados relevantes.');
+    expect(page).toContain('No se pudo consultar.');
+    expect(page).not.toContain('No se encontró un precio coincidente.');
     expect(page).toContain("'catalog-miss'");
     expect(page).toContain('id="cancel-scan"');
-    expect(page).toContain('Para escanear con la cámara se requiere HTTPS. La búsqueda manual sigue disponible.');
-    expect(page).toContain('Escaneo cancelado. La búsqueda manual está lista.');
+    expect(page).toContain('HTTPS requerido. Busque manualmente.');
+    expect(page).toContain('Escaneo cancelado.');
     expect(page).toContain("on ? 'Apagar luz' : 'Encender luz'");
   });
 
@@ -123,11 +123,11 @@ describe('public manual lookup page', () => {
     expect(page).toContain('for (const item of items)');
     expect(page).toContain("document.createElement('ol')");
     expect(page).toContain("'aria-label', 'Resultados de búsqueda ordenados'");
-    expect(page).toContain("items.length === 1 ? 'precio encontrado' : 'precios encontrados'");
+    expect(page).toContain("items.length === 1 ? 'resultado' : 'resultados'");
     expect(page).toContain("new Intl.DateTimeFormat('es-AR'");
     expect(page).toContain("timeZone: 'America/Argentina/Buenos_Aires'");
-    expect(page).toContain('Última actualización:');
-    expect(page).toContain('No hay información sobre la actualización del catálogo');
+    expect(page).toContain('Actualizado:');
+    expect(page).toContain('Sin actualización.');
     expect(page).toContain('showResults(data.results, data.freshness)');
     expect(page).not.toContain('data.results[0]');
   });

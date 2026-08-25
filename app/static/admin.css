@@ -5,7 +5,7 @@ body { margin: 0; min-width: 20rem; min-height: 100svh; background: linear-gradi
 button, input { font: inherit; }
 .admin-shell, .auth-shell { width: min(100% - 2rem, 48rem); margin: 0 auto; padding: 2rem 0 4rem; }
 .admin-shell--login { display: grid; align-content: center; width: min(100% - 2rem, 24rem); min-height: 100svh; padding: max(1.5rem, env(safe-area-inset-top)) 0 max(2rem, env(safe-area-inset-bottom)); }
-.auth-shell { width: min(100% - 2rem, 32rem); padding-top: max(4rem, 12vh); }
+.auth-shell { display: grid; align-content: center; width: min(100% - 2rem, 24rem); min-height: 100svh; padding: max(1.5rem, env(safe-area-inset-top)) 0 max(2rem, env(safe-area-inset-bottom)); }
 .admin-header { border-bottom: 1px solid var(--line); padding-bottom: 1.25rem; }
 .back-link { color: var(--brand); font-size: .875rem; font-weight: 750; text-decoration-color: #737373; text-decoration-thickness: 2px; text-underline-offset: .22em; }
 .login-back { justify-self: start; margin-bottom: 1rem; }
@@ -18,9 +18,12 @@ h3 { font-size: 1.05rem; margin-bottom: 0; }
 .intro, .panel-heading > p:not(.step), .confirmation > p { color: var(--muted); line-height: 1.5; margin-bottom: 0; }
 .workspace { display: grid; gap: 1.25rem; margin-top: 1.5rem; }
 .admin-shell--login .workspace { gap: 1rem; margin-top: 0; }
+.auth-shell .workspace { gap: 1rem; margin-top: 0; }
 .panel, .preview, .success { background: var(--surface); border: 1px solid var(--line); border-radius: .5rem; padding: 1.25rem; box-shadow: 0 12px 28px rgb(0 0 0 / 7%); }
 .admin-shell--login .panel { border-color: var(--line); border-radius: .75rem; padding: 1.4rem; box-shadow: 0 14px 30px rgb(0 0 0 / 9%), 0 1px 0 rgb(255 255 255 / 90%) inset; }
+.auth-shell .panel { border-radius: .75rem; padding: 1.4rem; }
 .panel { display: grid; gap: 1.25rem; }
+.auth-shell .panel-heading { text-align: center; }
 .panel-heading .step, .success .step, .preview .step { margin-top: 0; }
 form { display: grid; gap: .75rem; }
 label { font-size: .9375rem; font-weight: 700; }
@@ -29,6 +32,7 @@ input[type="password"], input[type="file"] { background: var(--surface); border:
 .file-field { display: grid; gap: .5rem; }
 .file-name { color: var(--muted); font-size: .875rem; margin: 0; overflow-wrap: anywhere; }
 .button { border: 1px solid transparent; border-radius: .3rem; cursor: pointer; font-weight: 750; justify-self: start; min-height: 2.8rem; padding: .6rem 1rem; }
+.auth-shell .button { justify-self: stretch; }
 .button.primary { border-color: var(--brand); background: linear-gradient(180deg, #2a2a2a, var(--brand)); color: #ffffff; }
 .button.secondary { background: var(--surface); border-color: var(--action); color: var(--action); }
 .button.danger { background: var(--error); color: #fff; }
@@ -38,7 +42,6 @@ input[type="password"], input[type="file"] { background: var(--surface); border:
 :focus-visible { outline: 3px solid #000000; outline-offset: 3px; box-shadow: 0 0 0 5px #ffffff; }
 .preview { background: var(--surface-tint); display: grid; gap: 1.25rem; }
 .preview-heading { align-items: start; display: flex; gap: 1rem; justify-content: space-between; }
-.non-mutating { background: #e7e5e4; border-radius: 999px; color: var(--action); font-size: .8125rem; font-weight: 750; padding: .35rem .55rem; white-space: nowrap; }
 .summary-list { border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(2, 1fr); margin: 0; }
 .summary-list > div { border-bottom: 1px solid var(--line); padding: .8rem 0; }
 .summary-list > div:nth-child(odd) { padding-right: 1rem; }
@@ -52,4 +55,4 @@ dd { font-size: 1.05rem; font-weight: 750; margin: .2rem 0 0; }
 .status[data-tone="error"] { background: #f8ece8; border-color: #d2a097; color: var(--error); }
 .status[data-tone="success"] { background: #f4f4f5; border-color: #d4d4d8; color: var(--success); }
 .sr-only { clip: rect(0, 0, 0, 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
-@media (max-width: 32rem) { .admin-shell, .auth-shell { width: min(100% - 1.25rem, 48rem); padding-top: 1.25rem; } .admin-shell--login { width: min(100% - 1.25rem, 24rem); min-height: 100svh; padding-top: max(1.25rem, env(safe-area-inset-top)); } .auth-shell { max-width: 32rem; padding-top: max(2rem, 8vh); } .preview-heading { display: block; } .non-mutating { display: inline-block; margin-top: .75rem; } .summary-list { grid-template-columns: 1fr; } .summary-list > div:nth-child(odd) { padding-right: 0; } .button { justify-self: stretch; } }
+@media (max-width: 32rem) { .admin-shell, .auth-shell { width: min(100% - 1.25rem, 48rem); padding-top: 1.25rem; } .admin-shell--login { width: min(100% - 1.25rem, 24rem); min-height: 100svh; padding-top: max(1.25rem, env(safe-area-inset-top)); } .auth-shell { align-content: center; width: min(100% - 1.25rem, 24rem); max-width: 24rem; min-height: 100svh; padding-top: max(1.25rem, env(safe-area-inset-top)); } .preview-heading { display: block; } .summary-list { grid-template-columns: 1fr; } .summary-list > div:nth-child(odd) { padding-right: 0; } .button { justify-self: stretch; } }

@@ -52,13 +52,13 @@ function showLoading() {
   result.dataset.loading = 'true';
   result.setAttribute('aria-busy', 'true');
   result.replaceChildren(document.createElement('div'));
-  setStatus('Consultando el precio actual…', 'loading');
+  setStatus('Buscando…', 'loading');
 }
 
 function showResults(items, freshness) {
   if (scanDebugEnabled) scanDebugPanel.hidden = true;
   const heading = document.createElement('h2'); heading.className = 'results-heading';
-  heading.textContent = `${items.length} ${items.length === 1 ? 'precio encontrado' : 'precios encontrados'}`;
+  heading.textContent = `${items.length} ${items.length === 1 ? 'resultado' : 'resultados'}`;
   const list = document.createElement('ol'); list.className = 'results'; list.setAttribute('aria-label', 'Resultados de búsqueda ordenados');
   for (const item of items) {
     const listItem = document.createElement('li'); listItem.className = 'result-item';
@@ -69,9 +69,9 @@ function showResults(items, freshness) {
     list.append(listItem);
   }
   const updated = document.createElement('p'); updated.className = 'freshness';
-  updated.textContent = freshness ? `Última actualización: ${formatArgentinaDateTime(freshness)}` : 'No hay información sobre la actualización del catálogo';
+  updated.textContent = freshness ? `Actualizado: ${formatArgentinaDateTime(freshness)}` : 'Sin actualización.';
   result.dataset.loading = 'false'; result.setAttribute('aria-busy', 'false'); result.replaceChildren(heading, list, updated);
-  setStatus(`${items.length} ${items.length === 1 ? 'precio encontrado' : 'precios encontrados'}.`, 'success');
+  setStatus(`${items.length} ${items.length === 1 ? 'resultado' : 'resultados'}.`, 'success');
 }
 
 function reportScannerDebug(event) {
@@ -95,7 +95,7 @@ function reportScannerDebug(event) {
 }
 
 async function lookup(query, decoded = false) {
-  if (!query) { setStatus('Ingrese un código, artículo, marca o categoría para buscar.', 'error'); input.focus(); return 'retry'; }
+  if (!query) { setStatus('Ingrese un código o artículo.', 'error'); input.focus(); return 'retry'; }
   submit.disabled = true; showLoading();
   try {
     const response = await fetch(`/api/v1/search?q=${encodeURIComponent(query)}`, { headers: { accept: 'application/json' } });
@@ -103,12 +103,12 @@ async function lookup(query, decoded = false) {
     if (response.status === 400) throw new Error('invalid-query');
     if (!response.ok) throw new Error('server-failure');
     const data = await response.json();
-    if (data.results.length === 0) { result.hidden = true; setStatus(decoded ? 'No se encontró un precio coincidente. Continúe escaneando o busque manualmente.' : 'No se encontró un precio coincidente. Verifique el código o pruebe con otro artículo.', 'empty'); return 'not-found'; }
+    if (data.results.length === 0) { result.hidden = true; setStatus('No hay resultados relevantes.', 'empty'); return 'not-found'; }
     showResults(data.results, data.freshness);
     return 'matched';
   } catch (error) {
     result.hidden = true;
-    setStatus(error instanceof Error && error.message === 'invalid-query' ? 'Ingrese un código o artículo válido e inténtelo nuevamente.' : 'No se puede consultar el precio en este momento. Verifique la conexión e inténtelo nuevamente.', 'error');
+    setStatus(error instanceof Error && error.message === 'invalid-query' ? 'Código o artículo inválido.' : 'No se pudo consultar.', 'error');
     return 'retry';
   } finally { submit.disabled = false; result.setAttribute('aria-busy', 'false'); }
 }
@@ -125,14 +125,14 @@ async function lookupScannedBarcode(text) {
 
 function scannerState(state) {
   const messages = {
-    insecure: 'Para escanear con la cámara se requiere HTTPS. La búsqueda manual sigue disponible.',
-    unsupported: 'Este navegador no puede escanear este código de barras. Use la búsqueda manual.',
-    'permission-denied': 'La aplicación no tiene permiso para usar la cámara. Permítalo en la configuración del navegador o busque manualmente.',
-    'camera-error': 'La cámara se detuvo. Cierre el escáner y vuelva a abrirlo; si persiste, cierre otras aplicaciones que la usen.',
-    scanning: 'Escaneando en este dispositivo. Las imágenes de la cámara no salen de él.',
-    slow: 'Se sigue buscando. Mejore la iluminación, mantenga el código quieto o use la búsqueda manual.',
-    'catalog-miss': 'No se encontró un precio coincidente. Continúe escaneando o busque manualmente.',
-    unreadable: 'No se pudo leer un código válido. Enfoque el código dentro del recuadro y continúe escaneando.',
+    insecure: 'HTTPS requerido. Busque manualmente.',
+    unsupported: 'Escáner no disponible. Busque manualmente.',
+    'permission-denied': 'Sin permiso de cámara.',
+    'camera-error': 'Cámara detenida. Reintente.',
+    scanning: 'Escaneando…',
+    slow: 'Mejore la luz.',
+    'catalog-miss': 'No hay resultados relevantes.',
+    unreadable: 'No se pudo leer. Reencuadre.',
   };
   setStatus(messages[state], state === 'scanning' ? 'info' : state === 'catalog-miss' || state === 'unreadable' ? 'empty' : 'error');
   scannerStatus.textContent = messages[state];
@@ -146,7 +146,7 @@ const scanner = createBrowserScanner(camera, {
   onDecode: async (text) => { const outcome = await lookupScannedBarcode(text); if (outcome === 'matched') closeScanner(null, false); return outcome; },
 });
 
-function closeScanner(message = 'Escaneo cancelado. La búsqueda manual está lista.', restoreFocus = true) {
+function closeScanner(message = 'Escaneo cancelado.', restoreFocus = true) {
   scanner.stop();
   if (scannerPanel.open) scannerPanel.close();
   torch.hidden = true;

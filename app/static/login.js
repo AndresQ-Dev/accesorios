@@ -14,7 +14,7 @@ form.addEventListener('submit', async (event) => {
   event.preventDefault();
   if (submit.disabled) return;
   submit.disabled = true;
-  showStatus('Verificando acceso…');
+  showStatus('Ingresando…');
   try {
     const response = await fetch('/api/v1/login', {
       method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
@@ -23,16 +23,16 @@ form.addEventListener('submit', async (event) => {
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));
       const message = payload.error?.code === 'LOGIN_THROTTLED'
-        ? 'Se alcanzó el límite de intentos. Espere unos minutos antes de volver a intentar.'
+        ? 'Espere unos minutos.'
         : payload.error?.code === 'INVALID_APP_PASSWORD'
-        ? 'La contraseña no coincide. Revise el acceso e intente nuevamente.'
-        : 'No se pudo validar el acceso. Revise la contraseña e intente nuevamente.';
+        ? 'Acceso inválido.'
+        : 'No se pudo ingresar.';
       throw new Error(message);
     }
     const next = new URLSearchParams(window.location.search).get('next');
     window.location.assign(next?.startsWith('/') && !next.startsWith('//') ? next : '/');
   } catch (error) {
-    showStatus(error instanceof Error ? error.message : 'No se pudo iniciar sesión.', 'error');
+    showStatus(error instanceof Error ? error.message : 'No se pudo ingresar.', 'error');
     password.select();
   } finally {
     submit.disabled = false;

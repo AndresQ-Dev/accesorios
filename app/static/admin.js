@@ -24,23 +24,23 @@ let preview = null;
 let busy = false;
 
 const spanishError = {
-  INVALID_LOGIN: 'Ingresá la contraseña para continuar.',
-  INVALID_ADMIN_PASSWORD: 'La contraseña de administrador no coincide. Revisala e intentá nuevamente.',
-  INVALID_APP_PASSWORD: 'La contraseña de acceso no coincide. Volvé al ingreso principal.',
-  UNAUTHENTICATED: 'La sesión no es válida o venció. Volvé a ingresar.',
-  LOGIN_THROTTLED: 'Se alcanzó el límite de intentos. Esperá unos minutos antes de volver a intentar.',
-  INVALID_ORIGIN: 'La solicitud debe realizarse desde esta misma aplicación.',
-  INVALID_CSRF: 'La sesión de seguridad venció. Volvé a ingresar.',
-  UNSUPPORTED_MEDIA_TYPE: 'El archivo debe ser un XLSX válido.',
-  XLSX_TOO_LARGE: 'El archivo XLSX supera el tamaño permitido.',
-  INVALID_XLSX: 'El archivo XLSX no cumple con el formato aprobado. Corregilo y volvé a seleccionarlo.',
-  PREVIEW_NOT_FOUND: 'La vista previa ya no está disponible. Seleccioná el archivo nuevamente.',
-  PREVIEW_EXPIRED: 'La vista previa venció. Seleccioná el archivo nuevamente.',
-  PREVIEW_MISMATCH: 'La vista previa no coincide con el archivo preparado. Seleccioná el archivo nuevamente.',
-  REVISION_CONFLICT: 'El catálogo cambió desde la vista previa. Generá una nueva antes de confirmar.',
-  BARCODE_COLLISION: 'Uno de los códigos de barras ya pertenece a otro producto. Corregí el archivo y generá otra vista previa.',
-  INVALID_CONFIRMATION: 'No se pudo validar la confirmación. Seleccioná el archivo nuevamente.',
-  INTERNAL_ERROR: 'No se pudo completar la solicitud. Intentá nuevamente en unos minutos.',
+  INVALID_LOGIN: 'Ingrese la contraseña.',
+  INVALID_ADMIN_PASSWORD: 'Acceso inválido.',
+  INVALID_APP_PASSWORD: 'Acceso inválido.',
+  UNAUTHENTICATED: 'Sesión vencida.',
+  LOGIN_THROTTLED: 'Espere unos minutos.',
+  INVALID_ORIGIN: 'No se pudo completar.',
+  INVALID_CSRF: 'Sesión vencida.',
+  UNSUPPORTED_MEDIA_TYPE: 'XLSX inválido.',
+  XLSX_TOO_LARGE: 'XLSX demasiado grande.',
+  INVALID_XLSX: 'Formato inválido.',
+  PREVIEW_NOT_FOUND: 'Vista previa vencida.',
+  PREVIEW_EXPIRED: 'Vista previa vencida.',
+  PREVIEW_MISMATCH: 'Archivo distinto.',
+  REVISION_CONFLICT: 'Catálogo actualizado. Genere otra vista previa.',
+  BARCODE_COLLISION: 'Código de barras duplicado.',
+  INVALID_CONFIRMATION: 'Vista previa inválida.',
+  INTERNAL_ERROR: 'No se pudo completar.',
 };
 
 function showStatus(message, tone = 'info', focus = false) {
@@ -50,7 +50,7 @@ function showStatus(message, tone = 'info', focus = false) {
 }
 async function responseError(response) {
   const payload = await response.json().catch(() => ({}));
-  return { code: payload.error?.code, message: spanishError[payload.error?.code] ?? 'El servidor no pudo completar la solicitud. Intentá nuevamente.' };
+  return { code: payload.error?.code, message: spanishError[payload.error?.code] ?? 'No se pudo completar.' };
 }
 function setBusy(next) {
   busy = next;
@@ -88,61 +88,61 @@ function formatArgentinaDateTime(value) {
 }
 
 loginForm.addEventListener('submit', async (event) => {
-  event.preventDefault(); if (busy) return; setBusy(true); showStatus('Verificando acceso…');
+  event.preventDefault(); if (busy) return; setBusy(true); showStatus('Ingresando…');
   try {
     const response = await fetch('/api/v1/admin/login', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: password.value }) });
     if (!response.ok) throw new Error((await responseError(response)).message);
     const payload = await response.json();
-    if (typeof payload.csrfToken !== 'string') throw new Error('No se pudo iniciar una sesión segura. Intentá nuevamente.');
+    if (typeof payload.csrfToken !== 'string') throw new Error('No se pudo completar.');
     csrfToken = payload.csrfToken; password.value = ''; loginPanel.hidden = true;
     if (!importPanel) { window.location.reload(); return; }
     importPanel.hidden = false;
-    showStatus('Sesión iniciada. Seleccioná un archivo XLSX.', 'success'); fileInput.focus();
-  } catch (error) { showStatus(error instanceof Error ? error.message : 'No se pudo iniciar sesión. Intentá nuevamente.', 'error'); password.focus(); }
+    showStatus('Seleccione XLSX.', 'success'); fileInput.focus();
+  } catch (error) { showStatus(error instanceof Error ? error.message : 'No se pudo completar.', 'error'); password.focus(); }
   finally { setBusy(false); }
 });
 
 fileInput?.addEventListener('change', () => {
-  const file = fileInput.files?.[0]; fileName.textContent = file ? file.name : 'No se seleccionó ningún archivo.';
+  const file = fileInput.files?.[0]; fileName.textContent = file ? file.name : 'Sin archivo.';
   clearPreview(); successSummary.hidden = true; previewButton.disabled = !file;
 });
 
 previewForm?.addEventListener('submit', async (event) => {
   event.preventDefault(); const file = fileInput.files?.[0]; if (busy || !file || !csrfToken) return;
-  if (!file.name.toLowerCase().endsWith('.xlsx')) { showStatus('Seleccioná un archivo con extensión .xlsx.', 'error'); fileInput.focus(); return; }
-  clearPreview(); setBusy(true); showStatus('Validando archivo y generando vista previa…');
+  if (!file.name.toLowerCase().endsWith('.xlsx')) { showStatus('Seleccione .xlsx.', 'error'); fileInput.focus(); return; }
+  clearPreview(); setBusy(true); showStatus('Generando vista previa…');
   try {
     const response = await fetch('/api/v1/admin/import/preview', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'x-csrf-token': csrfToken }, body: file });
     if (response.status === 401 || response.status === 403) { returnToLogin((await responseError(response)).message); return; }
     if (!response.ok) throw new Error((await responseError(response)).message);
     const payload = await response.json();
-    if (!payload.previewReference || !payload.contentHash || !Number.isInteger(payload.baseCatalogVersion) || !Array.isArray(payload.rows)) throw new Error('La respuesta de la vista previa no es válida. Seleccioná el archivo nuevamente.');
+    if (!payload.previewReference || !payload.contentHash || !Number.isInteger(payload.baseCatalogVersion) || !Array.isArray(payload.rows)) throw new Error('Vista previa inválida.');
     preview = payload; rows.textContent = String(payload.rows.length); creates.textContent = String(payload.diff.creates);
     updates.textContent = String(payload.diff.updates); version.textContent = String(payload.baseCatalogVersion);
     expiry.textContent = formatArgentinaDateTime(payload.expiresAt); previewSummary.hidden = false;
-    showStatus('Vista previa lista. Revisá el resumen antes de confirmar.', 'success'); confirmButton.focus();
-  } catch (error) { showStatus(error instanceof Error ? error.message : 'No se pudo generar la vista previa.', 'error'); fileInput.focus(); }
+    showStatus('Vista previa lista.', 'success'); confirmButton.focus();
+  } catch (error) { showStatus(error instanceof Error ? error.message : 'No se pudo generar.', 'error'); fileInput.focus(); }
   finally { setBusy(false); }
 });
 
 confirmButton?.addEventListener('click', async () => {
-  if (busy || !preview || !csrfToken) return; setBusy(true); showStatus('Confirmando importación…');
+  if (busy || !preview || !csrfToken) return; setBusy(true); showStatus('Importando…');
   try {
     const response = await fetch('/api/v1/admin/import/confirm', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify({ previewReference: preview.previewReference, contentHash: preview.contentHash, baseCatalogVersion: preview.baseCatalogVersion }) });
     const payload = await response.json().catch(() => ({}));
-    if (response.status === 401 || response.status === 403) { returnToLogin(spanishError[payload.error?.code] ?? 'La sesión venció. Volvé a ingresar.'); return; }
+    if (response.status === 401 || response.status === 403) { returnToLogin(spanishError[payload.error?.code] ?? 'Sesión vencida.'); return; }
     if (!response.ok) {
-      if (invalidPreview(payload.error?.code)) { clearPreview(); fileInput.value = ''; fileName.textContent = 'Seleccioná nuevamente el archivo para generar otra vista previa.'; showStatus(spanishError[payload.error?.code] ?? 'La vista previa ya no es válida.', 'error'); fileInput.focus(); return; }
-      throw new Error(spanishError[payload.error?.code] ?? 'No se pudo confirmar la importación.');
+      if (invalidPreview(payload.error?.code)) { clearPreview(); fileInput.value = ''; fileName.textContent = 'Seleccione el archivo otra vez.'; showStatus(spanishError[payload.error?.code] ?? 'Vista previa inválida.', 'error'); fileInput.focus(); return; }
+      throw new Error(spanishError[payload.error?.code] ?? 'No se pudo importar.');
     }
-    successDetails.textContent = `Se registraron ${payload.creates ?? 0} altas y ${payload.updates ?? 0} actualizaciones. Versión del catálogo: ${payload.catalogVersion ?? '—'}.`;
-    clearPreview(); previewForm.reset(); fileName.textContent = 'No se seleccionó ningún archivo.';
-    successSummary.hidden = false; showStatus('Importación confirmada correctamente.', 'success'); newImport.focus();
-  } catch (error) { showStatus(error instanceof Error ? error.message : 'No se pudo confirmar la importación.', 'error'); confirmButton.focus(); }
+    successDetails.textContent = `Altas: ${payload.creates ?? 0}. Cambios: ${payload.updates ?? 0}. Versión: ${payload.catalogVersion ?? '—'}.`;
+    clearPreview(); previewForm.reset(); fileName.textContent = 'Sin archivo.';
+    successSummary.hidden = false; showStatus('Actualizado.', 'success'); newImport.focus();
+  } catch (error) { showStatus(error instanceof Error ? error.message : 'No se pudo importar.', 'error'); confirmButton.focus(); }
   finally { setBusy(false); }
 });
 
 newImport?.addEventListener('click', () => {
-  successSummary.hidden = true; previewForm.reset(); fileName.textContent = 'No se seleccionó ningún archivo.';
-  clearPreview(true); showStatus('Seleccioná un archivo XLSX para preparar otra importación.');
+  successSummary.hidden = true; previewForm.reset(); fileName.textContent = 'Sin archivo.';
+  clearPreview(true); showStatus('Seleccione XLSX.');
 });

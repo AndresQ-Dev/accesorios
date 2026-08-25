@@ -60,7 +60,7 @@ describe('public manual lookup page', () => {
     expect(page).toContain('.scan { width: 6rem; min-width: 6rem; height: 6rem; min-height: 6rem; border: 2px solid var(--accent); border-radius: 50%; place-items: center; color: var(--accent);');
     expect(page).toContain('.scan:hover { color: var(--accent); background: linear-gradient(180deg, #fdfdfc, #e7e5e4); }');
     expect(page).toContain('.scan:active { color: var(--accent); background: #e7e5e4; transform: translateY(1px); }');
-    expect(page).toContain('.scan svg { display: block; width: 3.85rem; height: 3.85rem; fill: currentColor; }');
+    expect(page).toContain('.scan-logo { display: block; width: 4.25rem; height: 4.25rem; object-fit: contain; }');
     expect(page).toContain('@media (max-height: 42rem)');
     expect(page).toContain('.scan { width: 5.35rem; min-width: 5.35rem; height: 5.35rem; min-height: 5.35rem; }');
     expect(page.indexOf('id="status"')).toBeGreaterThan(page.indexOf('<div class="lookup-stage">'));
@@ -71,7 +71,8 @@ describe('public manual lookup page', () => {
     const page = await publicSurface();
 
     expect(page).toContain('id="scan" type="button" aria-label="Abrir escáner de código de barras"');
-    expect(page).toContain('<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">');
+    expect(page).toContain('<img class="scan-logo"');
+    expect(page).toContain("filename='favicon.svg'");
     expect(page).toContain('aria-haspopup="dialog"');
     expect(page).toContain('aria-pressed="false"');
     expect(page).toContain('<dialog class="scanner" id="scanner" aria-modal="true" aria-labelledby="scanner-title"');

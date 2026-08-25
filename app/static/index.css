@@ -46,7 +46,7 @@ button { border: 1px solid var(--brand); padding: 0 1rem; color: #ffffff; backgr
 .scan { width: 6rem; min-width: 6rem; height: 6rem; min-height: 6rem; border: 2px solid var(--accent); border-radius: 50%; place-items: center; color: var(--accent); background: linear-gradient(180deg, #ffffff, #f3f3f2); box-shadow: 0 18px 38px rgb(0 0 0 / 16%), 0 0 0 .45rem rgb(0 0 0 / 5%); }
 .scan:hover { color: var(--accent); background: linear-gradient(180deg, #fdfdfc, #e7e5e4); }
 .scan:active { color: var(--accent); background: #e7e5e4; transform: translateY(1px); }
-.scan svg { display: block; width: 3.85rem; height: 3.85rem; fill: currentColor; }
+.scan-logo { display: block; width: 4.25rem; height: 4.25rem; object-fit: contain; }
 .icon-button svg { width: 1.375rem; height: 1.375rem; fill: currentColor; }
 .freshness { margin: .65rem 0 0; color: var(--muted); font-size: .875rem; font-weight: 650; line-height: 1.45; }
 .scanner:not([open]) { display: none; }
@@ -82,6 +82,6 @@ video { display: block; width: 100%; height: 100%; object-fit: cover; }
 .code { display: inline-flex; width: fit-content; margin-top: .75rem; border: 1px solid var(--line-strong); border-radius: 999px; padding: .28rem .6rem; color: var(--brand); background: var(--accent-soft); font-size: .82rem; font-weight: 800; letter-spacing: .035em; }
 @keyframes pulse { to { opacity: .52; } }
 @media (min-width: 34rem) { .scanner[open] { width: min(92vw, 44rem); height: min(92dvh, 54rem); margin: auto; } }
-@media (max-height: 42rem) { main { padding-top: max(.85rem, env(safe-area-inset-top)); } .lookup-stage { min-height: 13.5rem; align-items: start; padding-top: .75rem; } .lookup-controls { gap: 1.35rem; } .scan { width: 5.35rem; min-width: 5.35rem; height: 5.35rem; min-height: 5.35rem; } .scan svg { width: 3.35rem; height: 3.35rem; } }
-@media (max-height: 32rem) and (orientation: landscape) { main { padding-top: .75rem; padding-bottom: 1rem; } .lookup-stage { min-height: 8.75rem; padding-top: .25rem; } .lookup-controls { gap: .8rem; } .scan { width: 4.75rem; min-width: 4.75rem; height: 4.75rem; min-height: 4.75rem; } .scan svg { width: 2.9rem; height: 2.9rem; } .price { font-size: 2rem; } .scanner[open] { width: min(92vw, 44rem); height: 94dvh; margin: auto; } .scanner-header h2 { font-size: 1rem; } .scanner-footer { padding-top: .45rem; } }
+@media (max-height: 42rem) { main { padding-top: max(.85rem, env(safe-area-inset-top)); } .lookup-stage { min-height: 13.5rem; align-items: start; padding-top: .75rem; } .lookup-controls { gap: 1.35rem; } .scan { width: 5.35rem; min-width: 5.35rem; height: 5.35rem; min-height: 5.35rem; } .scan-logo { width: 3.55rem; height: 3.55rem; } }
+@media (max-height: 32rem) and (orientation: landscape) { main { padding-top: .75rem; padding-bottom: 1rem; } .lookup-stage { min-height: 8.75rem; padding-top: .25rem; } .lookup-controls { gap: .8rem; } .scan { width: 4.75rem; min-width: 4.75rem; height: 4.75rem; min-height: 4.75rem; } .scan-logo { width: 3.1rem; height: 3.1rem; } .price { font-size: 2rem; } .scanner[open] { width: min(92vw, 44rem); height: 94dvh; margin: auto; } .scanner-header h2 { font-size: 1rem; } .scanner-footer { padding-top: .45rem; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; scroll-behavior: auto !important; } }

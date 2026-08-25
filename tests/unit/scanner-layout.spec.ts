@@ -7,9 +7,10 @@ const page = [
 ].join('\n');
 
 describe('scanner guide layout', () => {
-  it('keeps the circular trigger while giving its camera icon a centered balanced inset', () => {
+  it('keeps the circular trigger while giving its barcode logo a centered balanced inset', () => {
     expect(page).toMatch(/\.scan \{[^}]*width: 6rem;[^}]*min-width: 6rem;[^}]*height: 6rem;[^}]*min-height: 6rem;[^}]*place-items: center;/);
-    expect(page).toMatch(/\.scan svg \{[^}]*width: 3\.85rem;[^}]*height: 3\.85rem;/);
+    expect(page).toContain('<img class="scan-logo"');
+    expect(page).toMatch(/\.scan-logo \{[^}]*width: 4\.25rem;[^}]*height: 4\.25rem;[^}]*object-fit: contain;/);
   });
 
   it('centers the instructional guide as an overlay over the video viewport', () => {

@@ -15,7 +15,7 @@ describe('PWA readiness', () => {
     expect(templates.match(/rel="manifest"/g)).toHaveLength(3);
     expect(templates.match(/apple-mobile-web-app-capable" content="yes"/g)).toHaveLength(3);
     expect(templates.match(/rel="apple-touch-icon"/g)).toHaveLength(3);
-    expect(templates.match(/favicon\.svg/g)).toHaveLength(3);
+    expect(templates.match(/rel="icon" type="image\/svg\+xml"/g)).toHaveLength(3);
     expect(templates.match(/pwa\.js/g)).toHaveLength(3);
     expect(templates).toContain('theme-color" content="#111111"');
     expect(templates).toContain('apple-mobile-web-app-title" content="Accesorios"');

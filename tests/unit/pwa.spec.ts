@@ -17,7 +17,7 @@ describe('PWA readiness', () => {
     expect(templates.match(/rel="apple-touch-icon"/g)).toHaveLength(3);
     expect(templates.match(/favicon\.svg/g)).toHaveLength(3);
     expect(templates.match(/pwa\.js/g)).toHaveLength(3);
-    expect(templates).toContain('theme-color" content="#0F172A"');
+    expect(templates).toContain('theme-color" content="#111111"');
     expect(templates).toContain('apple-mobile-web-app-title" content="Accesorios"');
   });
 
@@ -27,8 +27,8 @@ describe('PWA readiness', () => {
     expect(manifest.start_url).toBe('/');
     expect(manifest.scope).toBe('/');
     expect(manifest.display).toBe('standalone');
-    expect(manifest.theme_color).toBe('#0F172A');
-    expect(manifest.background_color).toBe('#F6F2E9');
+    expect(manifest.theme_color).toBe('#111111');
+    expect(manifest.background_color).toBe('#F5F5F4');
     expect(manifest.icons).toEqual(expect.arrayContaining([
       expect.objectContaining({ src: '/static/icons/icon-192.png', sizes: '192x192', purpose: 'any' }),
       expect.objectContaining({ src: '/static/icons/icon-512.png', sizes: '512x512', purpose: 'any' }),

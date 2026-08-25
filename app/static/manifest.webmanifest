@@ -7,8 +7,8 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#14213D",
-  "theme_color": "#14213D",
+  "background_color": "#F6F2E9",
+  "theme_color": "#0F172A",
   "orientation": "portrait",
   "categories": ["business", "utilities"],
   "icons": [

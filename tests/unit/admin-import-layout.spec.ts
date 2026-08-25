@@ -42,4 +42,12 @@ describe('admin XLSX import route', () => {
     expect(page).toContain('fileInput.focus();');
     expect(page).toContain('role="status"');
   });
+
+  it('keeps import controls behind the authenticated server render branch', () => {
+    const beforeImportGate = page.split('{% if admin_authenticated %}\n        <section id="import-panel"')[0];
+    expect(page).toContain('class="back-link login-back" href="/"');
+    expect(page).toContain('id="login-form"');
+    expect(page).toContain('id="admin-status"');
+    expect(beforeImportGate).not.toMatch(/id="(import-panel|preview-form|xlsx-file|confirm-import)"/);
+  });
 });

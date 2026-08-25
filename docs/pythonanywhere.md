@@ -68,8 +68,8 @@ flask --app wsgi:application db-validate
 ```
 
 The Alembic baseline uses `CREATE ... IF NOT EXISTS`, preserves existing IDs and timestamps, initializes
-`catalog_metadata` only when absent, and conditionally applies the verified migration-0004 alias. The additive
-migration creates only `app_sessions`, `login_attempts`, and `import_previews` plus their indexes.
+`catalog_metadata` only when absent, and ensures the verified ITF alias exists. The additive migrations create
+runtime session/import tables and allow products with pending prices.
 
 ## WSGI entrypoint
 

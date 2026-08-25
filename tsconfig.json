@@ -17,6 +17,7 @@
     "vitest.config.ts",
     "tests/unit/scanner.spec.ts",
     "tests/unit/public-lookup.spec.ts",
+    "tests/unit/pwa.spec.ts",
     "tests/unit/scanner-layout.spec.ts",
     "tests/unit/admin-import-layout.spec.ts"
   ]

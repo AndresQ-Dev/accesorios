@@ -27,7 +27,16 @@ def test_jinja_pages_preserve_accessible_lookup_admin_and_login_surfaces(
     assert b'apple-mobile-web-app-capable' in lookup.data
     admin = client.get("/admin", base_url=ORIGIN)
     assert b'id="login-panel"' in admin.data
+    assert b'class="back-link login-back" href="/"' in admin.data
+    assert b'id="login-form"' in admin.data
+    assert b'id="admin-status"' in admin.data
+    assert b'Administraci' not in admin.data
+    assert b'Importar cat' not in admin.data
+    assert b'Revis' not in admin.data
+    assert b'id="import-panel"' not in admin.data
     assert b'id="preview-form"' not in admin.data
+    assert b'id="xlsx-file"' not in admin.data
+    assert b'id="confirm-import"' not in admin.data
     assert b'Confirmar importaci' not in admin.data
     login_admin()
     admin = client.get("/admin", base_url=ORIGIN)

@@ -58,6 +58,8 @@ describe('public manual lookup page', () => {
     expect(page).toContain('.scan-launch { display: grid; place-items: center; }');
     expect(page.indexOf('id="scan"')).toBeLessThan(page.indexOf('id="lookup-form"'));
     expect(page).toContain('.scan { width: 6rem; min-width: 6rem; height: 6rem; min-height: 6rem; border: 2px solid var(--accent); border-radius: 50%; place-items: center; color: var(--accent);');
+    expect(page).toContain('.scan:hover { color: var(--accent); background: linear-gradient(180deg, #fdfdfc, #e7e5e4); }');
+    expect(page).toContain('.scan:active { color: var(--accent); background: #e7e5e4; transform: translateY(1px); }');
     expect(page).toContain('.scan svg { display: block; width: 3.85rem; height: 3.85rem; fill: currentColor; }');
     expect(page).toContain('@media (max-height: 42rem)');
     expect(page).toContain('.scan { width: 5.35rem; min-width: 5.35rem; height: 5.35rem; min-height: 5.35rem; }');

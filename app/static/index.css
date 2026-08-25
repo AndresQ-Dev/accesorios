@@ -44,6 +44,8 @@ button { border: 1px solid var(--brand); padding: 0 1rem; color: #ffffff; backgr
 .lookup-controls { display: grid; width: min(100%, 34rem); gap: clamp(1.7rem, 5.5svh, 3.25rem); justify-items: center; }
 .scan-launch { display: grid; place-items: center; }
 .scan { width: 6rem; min-width: 6rem; height: 6rem; min-height: 6rem; border: 2px solid var(--accent); border-radius: 50%; place-items: center; color: var(--accent); background: linear-gradient(180deg, #ffffff, #f3f3f2); box-shadow: 0 18px 38px rgb(0 0 0 / 16%), 0 0 0 .45rem rgb(0 0 0 / 5%); }
+.scan:hover { color: var(--accent); background: linear-gradient(180deg, #fdfdfc, #e7e5e4); }
+.scan:active { color: var(--accent); background: #e7e5e4; transform: translateY(1px); }
 .scan svg { display: block; width: 3.85rem; height: 3.85rem; fill: currentColor; }
 .icon-button svg { width: 1.375rem; height: 1.375rem; fill: currentColor; }
 .freshness { margin: .65rem 0 0; color: var(--muted); font-size: .875rem; font-weight: 650; line-height: 1.45; }

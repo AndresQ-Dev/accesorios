@@ -7,9 +7,9 @@ const page = [
 ].join('\n');
 
 describe('scanner guide layout', () => {
-  it('keeps the 6rem circular trigger while giving its camera icon a balanced inset', () => {
-    expect(page).toMatch(/\.scan \{[^}]*width: 6rem;[^}]*min-width: 6rem;[^}]*min-height: 6rem;[^}]*border-radius: 50%;/);
-    expect(page).toMatch(/\.scan svg \{[^}]*width: 4\.35rem;[^}]*height: 4\.35rem;/);
+  it('keeps the circular trigger while giving its camera icon a centered balanced inset', () => {
+    expect(page).toMatch(/\.scan \{[^}]*width: 6rem;[^}]*min-width: 6rem;[^}]*height: 6rem;[^}]*min-height: 6rem;[^}]*place-items: center;/);
+    expect(page).toMatch(/\.scan svg \{[^}]*width: 3\.85rem;[^}]*height: 3\.85rem;/);
   });
 
   it('centers the instructional guide as an overlay over the video viewport', () => {

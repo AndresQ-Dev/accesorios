@@ -53,11 +53,14 @@ describe('public manual lookup page', () => {
     expect(page).toContain('<div class="lookup-stage">');
     expect(page).toContain('<div class="lookup-controls">');
     expect(page).toMatch(/main \{[^}]*grid-template-rows: auto auto auto 1fr;[^}]*min-height: 100dvh;[^}]*scroll-padding-block:/);
-    expect(page).toContain('.lookup-stage { display: grid; min-height: clamp(12rem, 32svh, 17rem); align-items: end; justify-items: center; }');
-    expect(page).toContain('.lookup-controls { display: grid; width: min(100%, 34rem); gap: clamp(2.75rem, 7svh, 4rem); justify-items: center; }');
+    expect(page).toContain('.lookup-stage { display: grid; min-height: clamp(14rem, 46svh, 21rem); align-items: center; justify-items: center; padding-block: clamp(1rem, 5svh, 2.75rem) 0; }');
+    expect(page).toContain('.lookup-controls { display: grid; width: min(100%, 34rem); gap: clamp(1.7rem, 5.5svh, 3.25rem); justify-items: center; }');
     expect(page).toContain('.scan-launch { display: grid; place-items: center; }');
-    expect(page).toContain('.scan { width: 6rem; min-width: 6rem; min-height: 6rem; border-radius: 50%; }');
-    expect(page).toContain('.scan svg { width: 4.35rem; height: 4.35rem; fill: currentColor; transform: translateY(.18rem); }');
+    expect(page.indexOf('id="scan"')).toBeLessThan(page.indexOf('id="lookup-form"'));
+    expect(page).toContain('.scan { width: 6rem; min-width: 6rem; height: 6rem; min-height: 6rem; border: 2px solid var(--accent); border-radius: 50%; place-items: center; color: var(--accent);');
+    expect(page).toContain('.scan svg { display: block; width: 3.85rem; height: 3.85rem; fill: currentColor; }');
+    expect(page).toContain('@media (max-height: 42rem)');
+    expect(page).toContain('.scan { width: 5.35rem; min-width: 5.35rem; height: 5.35rem; min-height: 5.35rem; }');
     expect(page.indexOf('id="status"')).toBeGreaterThan(page.indexOf('<div class="lookup-stage">'));
     expect(page.indexOf('id="result"')).toBeGreaterThan(page.indexOf('id="status"'));
   });

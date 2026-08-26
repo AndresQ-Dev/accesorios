@@ -198,10 +198,9 @@ export class ScannerClient {
     if (outcome === 'matched') { this.stop(); return; }
     if (!this.active) return;
     if (outcome === 'not-found') {
-      this.diagnostic('catalog-miss', { candidate: this.codeDetails(text), retryDelayMs: this.idleRetryDelay() });
+      this.diagnostic('catalog-miss', { candidate: this.codeDetails(text) });
       this.environment.onState('catalog-miss');
-      this.idleStreak += 1;
-      this.retry(rescan, false, this.idleRetryDelay());
+      this.stop();
       return;
     }
     this.retry(rescan, false);

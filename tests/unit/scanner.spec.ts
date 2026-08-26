@@ -203,7 +203,7 @@ describe('private ITF scanner', () => {
     expect(second.stream.getTracks()[0].stop).toHaveBeenCalled();
   });
 
-  it('keeps scanning after a catalog miss while deduplicating the same candidate', async () => {
+  it('stops after a catalog miss while preserving retries for lookup failures', async () => {
     const media = stream(); const scheduler = scheduledCallbacks(); const states: string[] = []; const lookup = vi.fn().mockResolvedValue('not-found');
     const client = new ScannerClient(video(), {
       secure: true, getUserMedia: vi.fn().mockResolvedValue(media),
@@ -216,8 +216,8 @@ describe('private ITF scanner', () => {
     expect(lookup).toHaveBeenCalledOnce();
     expect(lookup).toHaveBeenCalledWith('04440000015833');
     expect(states).toContain('catalog-miss');
-    expect(media.getTracks()[0].stop).not.toHaveBeenCalled();
-    expect(scheduler.callbacks).toHaveLength(1);
+    expect(media.getTracks()[0].stop).toHaveBeenCalledOnce();
+    expect(scheduler.callbacks).toHaveLength(0);
   });
 
   it('emits safe diagnostic events without raw barcode values', async () => {
@@ -233,7 +233,7 @@ describe('private ITF scanner', () => {
     await client.start();
 
     const names = diagnostics.map(({ event }) => event);
-    expect(names).toEqual(expect.arrayContaining(['start', 'scan-fallback', 'plausible-candidate', 'catalog-miss', 'retry']));
+    expect(names).toEqual(expect.arrayContaining(['start', 'scan-fallback', 'plausible-candidate', 'catalog-miss', 'stop']));
     const text = JSON.stringify(diagnostics);
     expect(text).not.toContain('04440000015833');
     expect(text).toContain('"length":14');

@@ -143,7 +143,7 @@ const scanner = createBrowserScanner(camera, {
   onState: scannerState,
   onTorch: (available) => { torch.hidden = !available; },
   onDiagnostic: reportScannerDebug,
-  onDecode: async (text) => { const outcome = await lookupScannedBarcode(text); if (outcome === 'matched') closeScanner(null, false); return outcome; },
+  onDecode: async (text) => { const outcome = await lookupScannedBarcode(text); if (outcome === 'matched' || outcome === 'not-found') closeScanner(null, false); return outcome; },
 });
 
 function closeScanner(message = 'Escaneo cancelado.', restoreFocus = true) {

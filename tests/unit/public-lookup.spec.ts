@@ -85,7 +85,7 @@ describe('public manual lookup page', () => {
     expect(page).toContain('scanner.stop();');
     expect(page).toContain('scan.disabled = false;');
     expect(page).toContain("scan.setAttribute('aria-pressed', 'false');");
-    expect(page).toContain("if (outcome === 'matched') closeScanner(null, false)");
+    expect(page).toContain("if (outcome === 'matched' || outcome === 'not-found') closeScanner(null, false)");
     expect(page).toContain('async function lookupScannedBarcode(text)');
     expect(page).toContain("/^0[0-9]{13}$/.test(text)");
     expect(page).toContain('const withoutLeadingZero = text.slice(1);');

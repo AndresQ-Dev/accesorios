@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'precios-static-v1';
+const CACHE_VERSION = 'precios-static-v2';
 const STATIC_ASSETS = [
   '/static/admin.css',
   '/static/admin.js',

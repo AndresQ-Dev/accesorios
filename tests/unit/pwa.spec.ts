@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 const templates = [
   await readFile(new URL('../../app/templates/index.html', import.meta.url), 'utf8'),
@@ -37,11 +37,38 @@ describe('PWA readiness', () => {
   });
 
   it('caches static assets only and leaves API plus navigations to the network', () => {
-    expect(serviceWorker).toContain("const CACHE_VERSION = 'precios-static-v1'");
+    expect(serviceWorker).toContain("const CACHE_VERSION = 'precios-static-v2'");
+    expect(serviceWorker).not.toContain('precios-static-v1');
     expect(serviceWorker).toContain("'/static/vendor/zxing_reader.wasm'");
     expect(serviceWorker).toContain("if (url.pathname.startsWith('/api/')) return;");
     expect(serviceWorker).toContain("if (request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html')) return;");
     expect(serviceWorker).toContain('if (!STATIC_ASSETS.includes(url.pathname)) return;');
     expect(serviceWorker).not.toContain("cache.put('/'");
+  });
+
+  it('deletes the previous static cache when the replacement worker activates', async () => {
+    type WorkerEvent = { waitUntil: (promise: Promise<unknown>) => void };
+    const listeners: Record<string, (event: WorkerEvent) => void> = {};
+    const worker = {
+      addEventListener: (type: string, listener: (event: WorkerEvent) => void) => { listeners[type] = listener; },
+      clients: { claim: vi.fn() },
+      location: { origin: 'https://example.test' },
+      skipWaiting: vi.fn(),
+    };
+    const cacheStorage = {
+      keys: vi.fn().mockResolvedValue(['precios-static-v1', 'precios-static-v2']),
+      delete: vi.fn().mockResolvedValue(true),
+    };
+
+    new Function('self', 'caches', serviceWorker)(worker, cacheStorage);
+
+    let activation: Promise<unknown> | undefined;
+    listeners.activate({ waitUntil: (promise) => { activation = promise; } });
+    if (!activation) throw new Error('The service worker did not register an activate handler.');
+    await activation;
+
+    expect(cacheStorage.delete).toHaveBeenCalledWith('precios-static-v1');
+    expect(cacheStorage.delete).not.toHaveBeenCalledWith('precios-static-v2');
+    expect(worker.clients.claim).toHaveBeenCalledOnce();
   });
 });

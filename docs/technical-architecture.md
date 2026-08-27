@@ -146,7 +146,7 @@ Scanner -> filtro plausible                  -> acepta sólo 13 o 14 dígitos
 Scanner -> onDecode(text)                    -> llama lookupScannedBarcode(text)
 lookup -> /api/v1/search?q=<barcode>         -> busca catálogo
 match -> cierra cámara                       -> muestra resultado
-miss -> sigue escaneando                     -> evita repetir el mismo candidato
+miss -> closes the scanner                   -> preserves the no-results status
 ```
 
 Regla relevante: el reintento sin cero inicial es **sólo del scanner**, no de la búsqueda manual ni del backend.

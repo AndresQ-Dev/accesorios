@@ -1,15 +1,10 @@
-# Run Accesorios locally
+# Accesorios
 
-The Flask application is the primary runtime. It preserves the existing `/api/v1` contracts, serves the
-Jinja user interface, and keeps the browser-only ZXing scanner as compiled static assets.
+Private price lookup and catalog administration for accessories. Flask serves the protected Jinja UI and the versioned `/api/v1` API; SQLite stores catalog and operational state; the browser scanner is built from TypeScript into Flask static assets.
 
-## Quick path
+## Fast start
 
-1. Create a Python 3.13 virtual environment and install the application.
-2. Build the browser scanner assets.
-3. configure two independent password hashes and a private SQLite path.
-4. Apply and validate migrations.
-5. Start Flask without importing an `app.run()` side effect.
+**Requirements:** Python `>=3.13,<3.14` and Node `24.x`.
 
 ```bash
 python3.13 -m venv .venv
@@ -29,10 +24,20 @@ export COOKIE_SECURE=false
 .venv/bin/flask --app wsgi:application run --host 127.0.0.1 --port 5000
 ```
 
-Use local-only test passwords. Never commit passwords or generated hashes. `COOKIE_SECURE=false` is only for
-the loopback development server; production defaults to secure cookies and must use HTTPS.
+Use local-only passwords and hashes. `COOKIE_SECURE=false` is only for local HTTP; production requires HTTPS and secure cookies.
 
-## Verification
+## What operators can do
+
+| Area | Everyday flow |
+|---|---|
+| Price lookup | Sign in at `/login`, then search from `/` by code, barcode, article, brand, or category. A manual empty result says `No hay resultados relevantes.` |
+| Scanner | Open the camera from `/`. It accepts plausible 13/14-digit scans and looks up the code without uploading camera frames. A final miss says `Código no encontrado.` |
+| Admin editor | Open `/admin` after the application login, then complete the separate admin login. Search products, optionally filter records with a missing or zero price, load one record, and edit code, barcode, article, or price. A blank price is stored as no price and shown as `Sin precio`. |
+| XLSX import | In the same admin area, upload an XLSX to create a persistent, expiring preview, then confirm it. Confirmation verifies the preview hash and catalog version, creates a SQLite backup, and applies changes atomically. |
+
+Admin editing and XLSX import are separate capabilities; importing is not the only administrative workflow.
+
+## Verify locally
 
 ```bash
 .venv/bin/ruff check app tests_py
@@ -43,16 +48,22 @@ npm test -- --run
 npm run typecheck
 ```
 
-Create and verify an operator backup with:
+To make and verify an operator backup:
 
 ```bash
 .venv/bin/flask --app wsgi:application backup-create
 ```
 
-The command uses SQLite's online backup API, writes a SHA-256 sidecar, and applies count/byte retention.
-Database files, WAL files, previews, and backups remain under `data/`, never under `app/static/`.
+## Documentation
 
-## Deployment
+- [Technical architecture](docs/technical-architecture.md): route contracts, security boundaries, scanner behavior, data lifecycle, PWA, and test map.
+- [PythonAnywhere runbook](docs/pythonanywhere.md): safe pull, reload, static/PWA verification, and rollback guidance.
 
-Follow [`docs/pythonanywhere.md`](docs/pythonanywhere.md). The root `wsgi.py` exports `application` and does
-not start a development server at import time.
+## Guardrails
+
+- Never commit SQLite databases, WAL files, backups, XLSX files, previews, `.env` files, password hashes, or credentials. `data/` and backup paths are local/production state.
+- Keep `data/` and secrets outside `/static/`. Flask must be the only SQLite writer.
+- When scanner source or its dependency changes, run `npm run build:python-static`; generated static assets must be deployed with the change.
+- The service worker precaches only a closed static list. When that list changes, bump its cache version and deploy the updated service worker.
+
+For deployment, follow [the PythonAnywhere runbook](docs/pythonanywhere.md). The root `wsgi.py` exports `application` and does not start a development server when imported.

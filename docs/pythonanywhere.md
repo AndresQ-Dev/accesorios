@@ -1,137 +1,142 @@
-# Deploy the Flask application on PythonAnywhere
+# Deploy Accesorios safely on PythonAnywhere
 
-This procedure makes the Python application the only database writer. Complete every validation step before
-switching traffic; do not run any legacy writer against the same SQLite database afterward.
+Use this runbook to deploy the Flask application without exposing state or creating a second SQLite writer. PythonAnywhere configuration and the deployed directory are user-managed; this project has historically had two clones. **Pull in the clone actually configured by the Web app's WSGI file and `/static/` mapping, then reload that Web app.**
 
-## Quick path
+## Before you deploy
 
-1. Push the project code to GitHub, then clone it into your PythonAnywhere home directory.
-2. Create a Python 3.13 virtual environment and install `requirements.txt`.
-3. Build static scanner assets before upload, or build them where Node is available.
-4. Upload the prepared SQLite database to `data/catalog.sqlite`; product spreadsheets are intentionally not committed.
-5. Configure the WSGI file, environment secrets, and `/static/` mapping.
-6. Run Alembic/schema validation, reload the web app, and verify HTTPS login, search, admin login, and an isolated import.
+1. Identify the configured project path in the PythonAnywhere Web tab (WSGI file and `/static/` mapping).
+2. Confirm that path is the intended clone. Do not assume `/home/<user>/Precios_accesorios` is the live one.
+3. Stop or remove every other SQLite writer: legacy server, cron importer, or second web process.
+4. Keep the database, backups, XLSX files, and environment values outside `/static/` and outside Git.
+5. Build scanner assets where Node 24.x is available before deploying them.
 
-## Files and secrets
+## Runtime configuration
 
-Keep these paths outside `app/static/`:
+The application requires Python `>=3.13,<3.14`. Select the matching Python 3.13 virtualenv in the Web tab. Install the project from the configured checkout:
 
-| Purpose | Example path |
-|---|---|
-| SQLite database | `/home/<user>/Precios_accesorios/data/catalog.sqlite` |
-| Import backups | `/home/<user>/Precios_accesorios/data/backups` |
-| Virtual environment | `/home/<user>/.virtualenvs/precios-accesorios` |
+```bash
+python3.13 -m venv /home/<user>/.virtualenvs/precios-accesorios
+source /home/<user>/.virtualenvs/precios-accesorios/bin/activate
+pip install -e '.[dev]'
+```
 
-Set these values in the PythonAnywhere WSGI configuration or another private environment mechanism:
+Configure only values the application reads, using the WSGI file or another private PythonAnywhere mechanism:
 
 ```python
 import os
 
-os.environ["DATABASE_URL"] = "/home/<user>/Precios_accesorios/data/catalog.sqlite"
-os.environ["BACKUP_DIRECTORY"] = "/home/<user>/Precios_accesorios/data/backups"
-os.environ["APP_PASSWORD_HASH"] = "<pbkdf2-sha256 hash>"
-os.environ["ADMIN_PASSWORD_HASH"] = "<different pbkdf2-sha256 hash>"
-os.environ["FLASK_SECRET_KEY"] = "<long random secret>"
+os.environ["DATABASE_URL"] = "/home/<user>/private-data/catalog.sqlite"
+os.environ["BACKUP_DIRECTORY"] = "/home/<user>/private-data/backups"
+os.environ["APP_PASSWORD_HASH"] = "<application-password-hash>"
+os.environ["ADMIN_PASSWORD_HASH"] = "<different-admin-password-hash>"
 os.environ["TRUSTED_ORIGIN"] = "https://<user>.pythonanywhere.com"
+os.environ["COOKIE_SECURE"] = "true"
 ```
 
-Generate each hash offline with `flask --app wsgi:application password-hash`. Use distinct long passwords;
-never place plaintext credentials in the repository.
+Optional operational values are `SESSION_SECONDS`, `PREVIEW_SECONDS`, `BACKUP_RETENTION_COUNT`, and `BACKUP_RETENTION_BYTES`. Do **not** configure `FLASK_SECRET_KEY`: this application does not read it.
 
-For this deployment, a local ignored helper file can hold the generated values before you paste them into
-PythonAnywhere: `secrets/pythonanywhere.env`. Replace `YOUR_PYTHONANYWHERE_USERNAME` with the real account name
-before using the paths and origin. Do not upload this file to GitHub.
-
-The application password controls `/login`. The administrator password controls `/admin`, where missing product
-prices can be filled in after deployment.
-
-## Adopt and validate the existing database
-
-Stop every previous writer first. Upload the prepared database copy to:
-
-```text
-/home/<user>/Precios_accesorios/data/catalog.sqlite
-```
-
-When preparing that file from a live local SQLite runtime, do not copy only the `.sqlite` file while WAL is active.
-Use SQLite's online backup API or stop the writer and include all WAL state; otherwise recent imports can be absent
-from the uploaded database.
-
-Then create an operator backup before migration:
+Generate password hashes privately:
 
 ```bash
-cd /home/<user>/Precios_accesorios
-workon precios-accesorios
-flask --app wsgi:application backup-create
-flask --app wsgi:application db-upgrade
-flask --app wsgi:application db-validate
+flask --app wsgi:application password-hash '<password-entered-interactively-or-from-a-secure-source>'
 ```
 
-The Alembic baseline uses `CREATE ... IF NOT EXISTS`, preserves existing IDs and timestamps, initializes
-`catalog_metadata` only when absent, and ensures the verified ITF alias exists. The additive migrations create
-runtime session/import tables and allow products with pending prices.
+The application and administrator passwords are independent. Never commit plaintext credentials, real hashes, `.env` files, SQLite files, WAL files, backups, or XLSX files.
 
-## WSGI entrypoint
+## WSGI and static mapping
 
-Point the PythonAnywhere WSGI file at the project; do not call `app.run()`:
+The WSGI file should add the configured checkout to `sys.path` and import the supplied WSGI application without calling `app.run()`:
 
 ```python
 import sys
 
-project = "/home/<user>/Precios_accesorios"
+project = "/home/<user>/<configured-clone>"
 if project not in sys.path:
     sys.path.insert(0, project)
 
 from wsgi import application
 ```
 
-Select the matching Python 3.13 virtual environment in the Web tab.
-
-## Static mapping and WASM
-
-Add this static mapping in the Web tab:
+Map `/static/` only to the corresponding static directory in that same checkout:
 
 | URL | Directory |
 |---|---|
-| `/static/` | `/home/<user>/Precios_accesorios/app/static/` |
+| `/static/` | `/home/<user>/<configured-clone>/app/static/` |
 
-Before upload, run `npm ci && npm run build:python-static`. Confirm these generated files exist:
+Never map the project root, `data/`, private environment files, backups, or spreadsheet directories as static content.
 
-- `app/static/scanner.js`
-- `app/static/vendor/zxing_reader.wasm`
+## Safe deploy workflow
 
-After reload, verify HTTPS and MIME behavior:
+Run these commands in the exact configured clone, not merely the newest clone in the home directory:
 
 ```bash
-curl -I https://<user>.pythonanywhere.com/static/vendor/zxing_reader.wasm
+cd /home/<user>/<configured-clone>
+git pull --ff-only
+source /home/<user>/.virtualenvs/precios-accesorios/bin/activate
+pip install -e '.[dev]'
+flask --app wsgi:application backup-create
+flask --app wsgi:application db-upgrade
+flask --app wsgi:application db-validate
 ```
 
-The response must be successful and use `Content-Type: application/wasm`. If the static service reports a
-different MIME type, open a PythonAnywhere support request rather than serving the database or broad project
-directory through Flask.
+Build and deploy scanner assets with the matching source revision. If Node is available on the deployment host:
 
-## Storage and operations
+```bash
+npm ci
+npm run build:python-static
+```
 
-Defaults retain at most five import backups and 128 MiB, whichever limit is reached first. A single newest
-backup is always retained. Tune `BACKUP_RETENTION_COUNT` and `BACKUP_RETENTION_BYTES` downward if the account
-approaches its storage quota. Each backup has a `.sha256` sidecar and is produced through
-`sqlite3.Connection.backup` while WAL remains enabled.
+Otherwise build them in a controlled Node 24.x environment and ensure the deployed checkout contains the resulting `app/static/scanner.js` and `app/static/vendor/zxing_reader.wasm` from the same revision. Then reload the Web app from the PythonAnywhere Web tab.
 
-SQLite connections enable foreign keys, WAL, and a five-second busy timeout. Mutations use `BEGIN IMMEDIATE`.
-Do not run a second application writer, cron importer, or legacy Node server against this database.
+`git pull --ff-only` intentionally refuses a divergent deploy checkout. Resolve the deployment state before continuing; do not overwrite local database, backup, secret, or generated production state with Git commands.
 
-## Release and rollback checklist
+## Database safety
 
-- [ ] Previous writers are stopped.
+`DATABASE_URL` and `BACKUP_DIRECTORY` are production state. Before migration, create the verified backup shown above. SQLite runs with WAL; never copy only a live `.sqlite` file because recent writes can be in the WAL. Use the application's online backup or stop the one writer and preserve the complete SQLite state.
+
+The application is the sole expected writer. Do not run a second Flask instance, legacy Node server, cron import, or manual writer against the configured database. XLSX confirmation also creates a backup before its atomic catalog update.
+
+## Live verification after reload
+
+Replace `<origin>` with the configured HTTPS origin. Verify the live endpoints and static bytes, not just the files in the clone:
+
+```bash
+curl -fsSI https://<origin>/static/vendor/zxing_reader.wasm
+curl -fsS https://<origin>/static/service-worker.js
+curl -fsSI https://<origin>/static/service-worker.js
+curl -fsSI https://<origin>/static/scanner.js
+```
+
+Confirm all of the following:
+
+- The WASM request succeeds and has `Content-Type: application/wasm`.
+- The service-worker body contains `CACHE_VERSION='precios-static-v2'` for the current release and the response has `Service-Worker-Allowed: /`.
+- The scanner bundle request succeeds and serves the current build.
+- HTTPS `/login` works; `/` redirects without an application session.
+- `/admin` requires the application session first and then the independent admin login.
+- A manual search works; scanner camera access works on HTTPS; an admin product search/editor action and an isolated XLSX preview can be completed safely.
+
+PythonAnywhere can serve `/static/` directly, which bypasses Flask-provided headers. If direct static mapping omits `Service-Worker-Allowed: /`, configure the static serving path to preserve that header; otherwise the worker cannot use the required `/` scope.
+
+## Browser-cache troubleshooting
+
+The PWA caches only the closed static asset list. HTML, navigations, and API responses always use the network. When an asset is added or changed in the precache list, the release must also bump `CACHE_VERSION` and deploy the new service worker.
+
+If a browser keeps an old scanner or service worker:
+
+1. Confirm the live service-worker body and cache version with the commands above.
+2. In browser DevTools, inspect Application → Service Workers and verify the active worker's script URL and version.
+3. Reload after the new worker activates; if necessary unregister the old worker and clear only this site's storage.
+4. Re-check `/static/scanner.js` and the WASM response. Do not solve cache issues by broadening static mappings or exposing private directories.
+
+## Release checklist and rollback
+
+- [ ] The configured WSGI/static clone, not an unused clone, received the pull.
+- [ ] Python 3.13 virtualenv and configuration values are in use; no fictitious `FLASK_SECRET_KEY` was added.
 - [ ] A verified backup exists outside static paths.
-- [ ] `db-upgrade` and `db-validate` succeed.
-- [ ] `/login` blocks unauthenticated application access.
-- [ ] `/admin` still requires the independent administrator password.
-- [ ] Search and scanner assets work over HTTPS.
-- [ ] An XLSX preview survives a web-app reload and confirmation remains session-bound.
-- [ ] A test import creates a checksum backup and one audit/import run.
+- [ ] `db-upgrade` and `db-validate` succeeded.
+- [ ] The Web app was reloaded after the pull/build/configuration change.
+- [ ] WASM, service-worker body/version/header, and scanner bundle were checked live.
+- [ ] Authentication, search, admin barrier, and an isolated preview were verified over HTTPS.
 
-Rollback means stopping the Python web app, restoring the verified pre-migration backup to a new path, pointing
-`DATABASE_URL` at that restored file, and validating it before enabling exactly one writer. The additive tables
-do not alter existing catalog IDs or timestamps and may safely remain if returning temporarily to read-only
-legacy behavior.
+To roll back, stop or reload the Web app only after selecting a verified backup. Restore it to a new private path, point `DATABASE_URL` to that path, run `db-validate`, and reload with exactly one writer. Do not restore a database under `/static/` or replace a live SQLite file by copying a single `.sqlite` file while WAL is active.

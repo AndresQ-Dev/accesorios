@@ -15,6 +15,7 @@ const scannerStatus = document.querySelector('#scanner-status');
 const scanDebugPanel = document.querySelector('#scan-debug');
 const scanDebugList = scanDebugPanel.querySelector('ol');
 const scanDebugEntries = [];
+const SCANNER_NOT_FOUND_MESSAGE = 'Código no encontrado.';
 const scanDebugEnabled = (() => {
   try { return new URLSearchParams(window.location.search).get('scanDebug') === '1' || window.localStorage.getItem('scanDebug') === '1'; }
   catch { return false; }
@@ -94,7 +95,7 @@ function reportScannerDebug(event) {
   } catch { /* Diagnostic logging must never block scanning. */ }
 }
 
-async function lookup(query, decoded = false) {
+async function lookup(query, notFoundMessage = 'No hay resultados relevantes.') {
   if (!query) { setStatus('Ingrese un código o artículo.', 'error'); input.focus(); return 'retry'; }
   submit.disabled = true; showLoading();
   try {
@@ -103,7 +104,7 @@ async function lookup(query, decoded = false) {
     if (response.status === 400) throw new Error('invalid-query');
     if (!response.ok) throw new Error('server-failure');
     const data = await response.json();
-    if (data.results.length === 0) { result.hidden = true; setStatus('No hay resultados relevantes.', 'empty'); return 'not-found'; }
+    if (data.results.length === 0) { result.hidden = true; if (notFoundMessage) setStatus(notFoundMessage, 'empty'); return 'not-found'; }
     showResults(data.results, data.freshness);
     return 'matched';
   } catch (error) {
@@ -115,12 +116,13 @@ async function lookup(query, decoded = false) {
 
 async function lookupScannedBarcode(text) {
   input.value = text;
-  const outcome = await lookup(text, true);
-  if (outcome !== 'not-found' || !/^0[0-9]{13}$/.test(text)) return outcome;
+  const hasLeadingZeroFallback = /^0[0-9]{13}$/.test(text);
+  const outcome = await lookup(text, hasLeadingZeroFallback ? null : SCANNER_NOT_FOUND_MESSAGE);
+  if (outcome !== 'not-found' || !hasLeadingZeroFallback) return outcome;
   const withoutLeadingZero = text.slice(1);
   reportScannerDebug({ event: 'scanner-leading-zero-fallback', details: { originalLength: text.length, retryLength: withoutLeadingZero.length } });
   input.value = withoutLeadingZero;
-  return lookup(withoutLeadingZero, true);
+  return lookup(withoutLeadingZero, SCANNER_NOT_FOUND_MESSAGE);
 }
 
 function scannerState(state) {
@@ -131,7 +133,7 @@ function scannerState(state) {
     'camera-error': 'Cámara detenida. Reintente.',
     scanning: 'Escaneando…',
     slow: 'Mejore la luz.',
-    'catalog-miss': 'No hay resultados relevantes.',
+    'catalog-miss': SCANNER_NOT_FOUND_MESSAGE,
     unreadable: 'No se pudo leer. Reencuadre.',
   };
   setStatus(messages[state], state === 'scanning' ? 'info' : state === 'catalog-miss' || state === 'unreadable' ? 'empty' : 'error');

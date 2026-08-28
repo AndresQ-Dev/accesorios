@@ -38,6 +38,11 @@ describe('public manual lookup page', () => {
     expect(page).toContain('response.status === 400');
     expect(page).toContain('Buscando…');
     expect(page).toContain('No hay resultados relevantes.');
+    expect(page).toContain("const SCANNER_NOT_FOUND_MESSAGE = 'Código no encontrado.'");
+    expect(page).toContain("async function lookup(query, notFoundMessage = 'No hay resultados relevantes.')");
+    expect(page).toContain('hasLeadingZeroFallback ? null : SCANNER_NOT_FOUND_MESSAGE');
+    expect(page).toContain('return lookup(withoutLeadingZero, SCANNER_NOT_FOUND_MESSAGE);');
+    expect(page).toContain("'catalog-miss': SCANNER_NOT_FOUND_MESSAGE");
     expect(page).toContain('No se pudo consultar.');
     expect(page).not.toContain('No se encontró un precio coincidente.');
     expect(page).toContain("'catalog-miss'");

@@ -27,10 +27,22 @@ h3 { font-size: 1.05rem; margin-bottom: 0; }
 .panel-heading .step, .success .step, .preview .step { margin-top: 0; }
 form { display: grid; gap: .75rem; }
 label { font-size: .9375rem; font-weight: 700; }
-input[type="password"], input[type="file"] { background: var(--surface); border: 1px solid var(--line-strong); border-radius: .3rem; color: var(--ink); min-height: 2.8rem; padding: .55rem .7rem; width: 100%; }
+input[type="password"], input[type="file"], input[type="search"], input[type="text"], input[type="number"] { background: var(--surface); border: 1px solid var(--line-strong); border-radius: .3rem; color: var(--ink); min-height: 2.8rem; padding: .55rem .7rem; width: 100%; }
 .admin-shell--login input[type="password"] { min-height: 3rem; border-color: var(--brand); box-shadow: 0 10px 24px rgb(0 0 0 / 8%); }
 .file-field { display: grid; gap: .5rem; }
 .file-name { color: var(--muted); font-size: .875rem; margin: 0; overflow-wrap: anywhere; }
+.search-controls { display: grid; gap: .75rem; grid-template-columns: minmax(0, 1fr) auto; }
+.attention-filter { align-items: center; display: flex; gap: .5rem; font-weight: 400; }
+.attention-filter input { accent-color: var(--brand); block-size: 1rem; inline-size: 1rem; }
+.product-results { border-top: 1px solid var(--line); }
+.product-results > h3 { margin: 1rem 0 .5rem; }
+.product-result-list { display: grid; gap: .5rem; list-style: none; margin: 0; padding: 0; }
+.product-result { background: var(--surface-tint); border: 1px solid var(--line); border-radius: .3rem; color: inherit; cursor: pointer; display: grid; gap: .2rem; padding: .75rem; text-align: left; width: 100%; }
+.product-result:hover { background: var(--surface); border-color: var(--line-strong); }
+.product-result__article { font-size: .9375rem; font-weight: 750; }
+.product-result__meta, .field-hint, .revision { color: var(--muted); font-size: .8125rem; line-height: 1.4; margin: 0; overflow-wrap: anywhere; }
+.product-editor { border-top: 1px solid var(--line); padding-top: 1.25rem; }
+.editor-heading { align-items: baseline; display: flex; gap: .75rem; justify-content: space-between; }
 .button { border: 1px solid transparent; border-radius: .3rem; cursor: pointer; font-weight: 750; justify-self: start; min-height: 2.8rem; padding: .6rem 1rem; }
 .auth-shell .button { justify-self: stretch; }
 .button.primary { border-color: var(--brand); background: linear-gradient(180deg, #2a2a2a, var(--brand)); color: #ffffff; }
@@ -55,4 +67,4 @@ dd { font-size: 1.05rem; font-weight: 750; margin: .2rem 0 0; }
 .status[data-tone="error"] { background: #f8ece8; border-color: #d2a097; color: var(--error); }
 .status[data-tone="success"] { background: #f4f4f5; border-color: #d4d4d8; color: var(--success); }
 .sr-only { clip: rect(0, 0, 0, 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
-@media (max-width: 32rem) { .admin-shell, .auth-shell { width: min(100% - 1.25rem, 48rem); padding-top: 1.25rem; } .admin-shell--login { width: min(100% - 1.25rem, 24rem); min-height: 100svh; padding-top: max(1.25rem, env(safe-area-inset-top)); } .auth-shell { align-content: center; width: min(100% - 1.25rem, 24rem); max-width: 24rem; min-height: 100svh; padding-top: max(1.25rem, env(safe-area-inset-top)); } .preview-heading { display: block; } .summary-list { grid-template-columns: 1fr; } .summary-list > div:nth-child(odd) { padding-right: 0; } .button { justify-self: stretch; } }
+@media (max-width: 32rem) { .admin-shell, .auth-shell { width: min(100% - 1.25rem, 48rem); padding-top: 1.25rem; } .admin-shell--login { width: min(100% - 1.25rem, 24rem); min-height: 100svh; padding-top: max(1.25rem, env(safe-area-inset-top)); } .auth-shell { align-content: center; width: min(100% - 1.25rem, 24rem); max-width: 24rem; min-height: 100svh; padding-top: max(1.25rem, env(safe-area-inset-top)); } .preview-heading { display: block; } .summary-list { grid-template-columns: 1fr; } .summary-list > div:nth-child(odd) { padding-right: 0; } .search-controls { grid-template-columns: 1fr; } .editor-heading { align-items: start; flex-direction: column; gap: .25rem; } .button { justify-self: stretch; } }

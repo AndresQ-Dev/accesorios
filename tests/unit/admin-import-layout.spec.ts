@@ -46,10 +46,28 @@ describe('admin XLSX import route', () => {
   });
 
   it('keeps import controls behind the authenticated server render branch', () => {
-    const beforeImportGate = page.split('{% if admin_authenticated %}\n        <section id="import-panel"')[0];
+    const beforeImportGate = page.slice(0, page.indexOf('<section id="import-panel"'));
     expect(page).toContain('class="back-link login-back" href="/"');
     expect(page).toContain('id="login-form"');
     expect(page).toContain('id="admin-status"');
     expect(beforeImportGate).not.toMatch(/id="(import-panel|preview-form|xlsx-file|confirm-import)"/);
+  });
+
+  it('provides a separate protected product editor that preserves nullable prices', () => {
+    expect(page).toContain('id="catalog-panel"');
+    expect(page).toContain('id="product-search-form"');
+    expect(page).toContain('id="product-editor"');
+    expect(page).toContain('id="product-code"');
+    expect(page).toContain('id="product-barcode"');
+    expect(page).toContain('id="product-article"');
+    expect(page).toContain('id="product-price"');
+    expect(page).toContain('id="product-price-attention"');
+    expect(page).toContain("searchParameters.set('needsPriceAttention', 'true')");
+    expect(page).toContain('new URLSearchParams()');
+    expect(page).toContain('`/api/v1/admin/products?${searchParameters.toString()}`');
+    expect(page).toContain("method: 'PATCH'");
+    expect(page).toContain("'x-csrf-token': csrfToken");
+    expect(page).toContain("priceArs: priceRaw === '' ? null : Number(priceRaw)");
+    expect(page).toContain("productPrice.value = product.priceArs === null ? '' : String(product.priceArs)");
   });
 });

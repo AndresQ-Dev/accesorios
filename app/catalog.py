@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from sqlalchemy import Connection, text
@@ -10,6 +11,7 @@ from app.search import normalize_search_text
 
 VERIFIED_ALIAS = "04440000015833"
 VERIFIED_CANONICAL = "4440000015833"
+PRODUCT_TEXT_LIMIT = 512
 
 
 def display_text(value: str) -> str:
@@ -74,6 +76,52 @@ def _audit(
             "details": json.dumps(details, ensure_ascii=False, separators=(",", ":")),
         },
     )
+
+
+def _edit_text(raw: Any, field: str, *, required: bool = True) -> str | None:
+    if not isinstance(raw, str):
+        raise ApiError(422, "INVALID_EDIT", "Product edit is invalid.", {field: "Must be text"})
+    value = display_text(raw)
+    if required and not value:
+        raise ApiError(422, "INVALID_EDIT", "Product edit is invalid.", {field: "Required"})
+    if len(value) > PRODUCT_TEXT_LIMIT:
+        raise ApiError(422, "INVALID_EDIT", "Product edit is invalid.", {field: "Too long"})
+    return value or None
+
+
+def _edit_barcode(raw: Any) -> str | None:
+    if raw is None:
+        return None
+    barcode = _edit_text(raw, "barcode", required=False)
+    if barcode is not None and re.search(r"e[+-]?\d+$", barcode, re.IGNORECASE):
+        raise ApiError(422, "INVALID_EDIT", "Product edit is invalid.", {"barcode": "Invalid"})
+    return barcode
+
+
+def _assert_edit_identifier_conflicts(
+    connection: Connection,
+    product_id: int,
+    code_key: str,
+    barcode: str | None,
+    current_barcode: str | None,
+) -> None:
+    duplicate_code = connection.execute(
+        text("SELECT 1 FROM products WHERE code_key = :key AND id != :id"),
+        {"key": code_key, "id": product_id},
+    ).first()
+    if duplicate_code:
+        raise ApiError(409, "CODE_COLLISION", "A product with this code already exists.")
+    barcode_key = normalize_search_text(barcode) if barcode else None
+    current_barcode_key = normalize_search_text(current_barcode) if current_barcode else None
+    if barcode_key is None or barcode_key == current_barcode_key:
+        return
+    canonical = connection.execute(
+        text("SELECT barcode FROM products WHERE id != :id AND barcode IS NOT NULL"),
+        {"id": product_id},
+    ).scalars()
+    aliases = connection.execute(text("SELECT alias FROM barcode_aliases")).scalars()
+    if any(normalize_search_text(value) == barcode_key for value in (*canonical, *aliases)):
+        raise ApiError(409, "BARCODE_COLLISION", "A barcode belongs to another product.")
 
 
 def _category_view(row: dict[str, Any]) -> dict[str, Any]:
@@ -195,13 +243,19 @@ def edit_product(
 ) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ApiError(422, "INVALID_EDIT", "Product edit is invalid.")
-    if set(payload) - {"expectedRevision", "priceArs", "brand", "categoryId"}:
+    if set(payload) - {
+        "expectedRevision", "priceArs", "brand", "categoryId", "code", "barcode", "article"
+    }:
         raise ApiError(422, "INVALID_EDIT", "Product edit is invalid.")
     expected = payload.get("expectedRevision")
     price = payload.get("priceArs")
-    if isinstance(expected, bool) or not isinstance(expected, int):
+    if isinstance(expected, bool) or not isinstance(expected, int) or expected < 1:
         raise ApiError(422, "INVALID_EDIT", "Product edit is invalid.")
-    if isinstance(price, bool) or not isinstance(price, int) or price < 0:
+    if (
+        "priceArs" not in payload
+        or isinstance(price, bool)
+        or (price is not None and (not isinstance(price, int) or price < 0))
+    ):
         raise ApiError(422, "INVALID_EDIT", "Product edit is invalid.")
     if (
         "brand" in payload
@@ -214,11 +268,21 @@ def edit_product(
         if isinstance(category_id_value, bool) or not isinstance(category_id_value, int):
             raise ApiError(422, "INVALID_EDIT", "Product edit is invalid.")
     current = connection.execute(
-        text("SELECT brand, category_id AS categoryId FROM products WHERE id = :id"),
+        text(
+            "SELECT code, code_key AS codeKey, barcode, article, brand, "
+            "category_id AS categoryId FROM products WHERE id = :id"
+        ),
         {"id": product_id},
     ).mappings().one_or_none()
     if current is None:
         raise ApiError(404, "PRODUCT_NOT_FOUND", "Product does not exist.")
+    code = current["code"] if "code" not in payload else _edit_text(payload["code"], "code")
+    article = current["article"] if "article" not in payload else _edit_text(payload["article"], "article")
+    barcode = current["barcode"] if "barcode" not in payload else _edit_barcode(payload["barcode"])
+    assert code is not None
+    assert article is not None
+    code_key = normalize_search_text(code)
+    _assert_edit_identifier_conflicts(connection, product_id, code_key, barcode, current["barcode"])
     brand = current["brand"] if "brand" not in payload else payload["brand"]
     if isinstance(brand, str):
         brand = brand.strip()
@@ -233,13 +297,20 @@ def edit_product(
                 {"categoryId": "Must reference an active category"},
             )
     changed = connection.execute(
-        text(
-            "UPDATE products SET brand = :brand, brand_key = :brand_key, category_id = :category_id, "
-            "price_ars = :price, revision = revision + 1, updated_at = CURRENT_TIMESTAMP "
-            "WHERE id = :id AND revision = :expected"
-        ),
-        {
-            "brand": brand,
+            text(
+                "UPDATE products SET code = :code, code_key = :code_key, barcode = :barcode, "
+                "article = :article, article_key = :article_key, brand = :brand, brand_key = :brand_key, "
+                "category_id = :category_id, price_ars = :price, revision = revision + 1, "
+                "updated_at = CURRENT_TIMESTAMP "
+                "WHERE id = :id AND revision = :expected"
+            ),
+            {
+                "code": code,
+                "code_key": code_key,
+                "barcode": barcode,
+                "article": article,
+                "article_key": normalize_search_text(article),
+                "brand": brand,
             "brand_key": normalize_search_text(brand) if brand else None,
             "category_id": category_id,
             "price": price,
@@ -249,10 +320,15 @@ def edit_product(
     )
     if changed.rowcount != 1:
         raise ApiError(409, "REVISION_CONFLICT", "Product changed before this edit could be applied.")
+    if barcode is not None:
+        try:
+            register_verified_itf_alias(connection, barcode)
+        except ValueError:
+            raise ApiError(409, "BARCODE_COLLISION", "A barcode belongs to another product.") from None
     _audit(connection, actor_hash, "product.updated", {"expectedRevision": expected}, product_id)
     row = connection.execute(
         text(
-            "SELECT products.id, products.code, products.brand, products.article, "
+            "SELECT products.id, products.code, products.barcode, products.brand, products.article, "
             "products.price_ars AS priceArs, products.revision, categories.id AS categoryId, "
             "categories.name AS categoryName, categories.active AS categoryActive "
             "FROM products LEFT JOIN categories ON categories.id = products.category_id "
@@ -271,9 +347,11 @@ def edit_product(
     return {
         "id": result["id"],
         "code": result["code"],
+        "barcode": result["barcode"],
         "brand": result["brand"],
         "article": result["article"],
         "priceArs": result["priceArs"],
         "revision": result["revision"],
         "category": category,
+        "catalogVersion": catalog_version(connection),
     }

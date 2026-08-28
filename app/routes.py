@@ -16,7 +16,7 @@ from app.catalog import add_category, edit_product, list_categories, patch_categ
 from app.db import read_connection, write_connection
 from app.errors import ApiError
 from app.imports import confirm_xlsx, preview_xlsx, read_xlsx_upload
-from app.search import normalize_search_text, search_catalog
+from app.search import admin_product, normalize_search_text, search_admin_catalog, search_catalog
 
 pages = Blueprint("pages", __name__)
 api = Blueprint("api", __name__, url_prefix="/api/v1")
@@ -152,6 +152,39 @@ def patch_product_route(product_id: str):  # type: ignore[no-untyped-def]
     payload = read_json_payload()
     with write_connection() as connection:
         result = edit_product(connection, product, payload, actor)
+    return jsonify(result)
+
+
+@api.get("/admin/products")
+def search_admin_products_route():  # type: ignore[no-untyped-def]
+    require_admin(csrf=False)
+    queries = request.args.getlist("q")
+    price_attention = request.args.getlist("needsPriceAttention")
+    if len(queries) > 1:
+        raise ApiError(400, "INVALID_QUERY", "The q query parameter is invalid.", {"q": "Required"})
+    if price_attention and price_attention != ["true"]:
+        raise ApiError(
+            400,
+            "INVALID_PRICE_ATTENTION",
+            "The needsPriceAttention query parameter is invalid.",
+            {"needsPriceAttention": "Must be true"},
+        )
+    query = queries[0] if queries else ""
+    needs_price_attention = price_attention == ["true"]
+    if len(query) > 512 or (normalize_search_text(query) == "" and not needs_price_attention):
+        raise ApiError(400, "INVALID_QUERY", "The q query parameter is invalid.", {"q": "Required"})
+    with read_connection() as connection:
+        return jsonify(search_admin_catalog(connection, query, needs_price_attention))
+
+
+@api.get("/admin/products/<product_id>")
+def admin_product_route(product_id: str):  # type: ignore[no-untyped-def]
+    product = _positive_id(product_id, "product")
+    require_admin(csrf=False)
+    with read_connection() as connection:
+        result = admin_product(connection, product)
+    if result is None:
+        raise ApiError(404, "PRODUCT_NOT_FOUND", "Product does not exist.")
     return jsonify(result)
 
 

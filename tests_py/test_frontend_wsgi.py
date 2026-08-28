@@ -40,12 +40,18 @@ def test_jinja_pages_preserve_accessible_lookup_admin_and_login_surfaces(
     assert b'id="preview-form"' not in admin.data
     assert b'id="xlsx-file"' not in admin.data
     assert b'id="confirm-import"' not in admin.data
+    assert b'id="catalog-panel"' not in admin.data
+    assert b'id="product-search-form"' not in admin.data
+    assert b'id="product-editor"' not in admin.data
     assert b'Confirmar importaci' not in admin.data
     login_admin()
     admin = client.get("/admin", base_url=ORIGIN)
     assert b'id="login-panel" class="panel" aria-labelledby="login-title" hidden' in admin.data
     assert b'id="preview-form"' in admin.data
     assert b'Confirmar importaci' in admin.data
+    assert b'id="catalog-panel"' in admin.data
+    assert b'id="product-search-form"' in admin.data
+    assert b'id="product-editor"' in admin.data
     assert b'/static/manifest.webmanifest' in admin.data
     assert b'name="robots" content="noindex, nofollow, noarchive"' in lookup.data
     assert b'name="robots" content="noindex, nofollow, noarchive"' in login.data

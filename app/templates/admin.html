@@ -42,6 +42,37 @@
           </form>
         </section>
         {% if admin_authenticated %}
+        <section id="catalog-panel" class="panel" aria-labelledby="catalog-title">
+          <div class="panel-heading">
+            <h2 id="catalog-title">Editar producto</h2>
+            <p>Busque por código, código de barras o artículo.</p>
+          </div>
+          <form id="product-search-form" role="search">
+            <label for="product-query">Buscar producto</label>
+            <div class="search-controls">
+              <input id="product-query" name="product-query" type="search" maxlength="512" autocomplete="off">
+              <button id="product-search-submit" class="button primary" type="submit">Buscar</button>
+            </div>
+            <label class="attention-filter" for="product-price-attention">
+              <input id="product-price-attention" name="needsPriceAttention" type="checkbox">
+              Sin precio o precio $0
+            </label>
+          </form>
+          <section id="product-results" class="product-results" aria-live="polite" aria-label="Resultados de productos" hidden></section>
+          <form id="product-editor" class="product-editor" aria-labelledby="product-editor-title" hidden>
+            <div class="editor-heading"><h3 id="product-editor-title">Producto</h3><p id="product-revision" class="revision">—</p></div>
+            <label for="product-code">Código</label>
+            <input id="product-code" name="code" type="text" maxlength="512" required>
+            <label for="product-barcode">Código de barras</label>
+            <input id="product-barcode" name="barcode" type="text" maxlength="512">
+            <label for="product-article">Artículo</label>
+            <input id="product-article" name="article" type="text" maxlength="512" required>
+            <label for="product-price">Precio</label>
+            <input id="product-price" name="price" type="number" min="0" max="9007199254740991" step="1" inputmode="numeric" aria-describedby="product-price-hint">
+            <p id="product-price-hint" class="field-hint">Deje vacío para indicar Sin precio.</p>
+            <button id="product-save" class="button primary" type="submit">Guardar cambios</button>
+          </form>
+        </section>
         <section id="import-panel" class="panel" aria-labelledby="import-title">
           <div class="panel-heading">
             <h2 id="import-title">Importar</h2>

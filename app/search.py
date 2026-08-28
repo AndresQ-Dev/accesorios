@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy import Connection, text
 
 UNDEFINED_LABEL = "Sin definir"
+ADMIN_SEARCH_LIMIT = 20
 
 
 def normalize_search_text(value: str) -> str:
@@ -98,14 +99,73 @@ def search_catalog(connection: Connection, raw_query: str) -> dict[str, Any]:
             _spanish_sort_key(entry[1]["code"]),
         ))
         products = [product for _, product in ranked]
-    metadata = connection.execute(
-        text(
-            "SELECT COALESCE(MAX(revision), 0) AS catalogVersion, "
-            "MAX(updated_at) AS freshness FROM products"
-        )
-    ).mappings().one()
+    metadata = _catalog_metadata(connection)
     return {
         "results": [_result(product) for product in products],
         "catalogVersion": metadata["catalogVersion"],
         "freshness": metadata["freshness"],
+    }
+
+
+def _catalog_metadata(connection: Connection) -> dict[str, Any]:
+    return dict(connection.execute(
+        text(
+            "SELECT COALESCE(MAX(revision), 0) AS catalogVersion, "
+            "MAX(updated_at) AS freshness FROM products"
+        )
+    ).mappings().one())
+
+
+def admin_product(connection: Connection, product_id: int) -> dict[str, Any] | None:
+    row = connection.execute(
+        text(
+            "SELECT id, code, barcode, article, price_ars AS priceArs, revision, "
+            "updated_at AS updatedAt FROM products WHERE id = :id"
+        ),
+        {"id": product_id},
+    ).mappings().one_or_none()
+    return None if row is None else dict(row)
+
+
+def search_admin_catalog(
+    connection: Connection, raw_query: str | None, needs_price_attention: bool = False,
+) -> dict[str, Any]:
+    query = normalize_search_text(raw_query or "")
+    if not query:
+        attention_clause = (
+            " WHERE products.price_ars IS NULL OR products.price_ars = 0"
+            if needs_price_attention else ""
+        )
+        products = [dict(row) for row in connection.execute(
+            text(PRODUCT_SELECT + attention_clause + " ORDER BY products.code_key LIMIT :limit"),
+            {"limit": ADMIN_SEARCH_LIMIT},
+        ).mappings()]
+        metadata = _catalog_metadata(connection)
+        return {
+            "results": [
+                {
+                    "id": product["id"], "code": product["code"], "barcode": product["barcode"],
+                    "article": product["article"], "priceArs": product["priceArs"],
+                    "revision": product["revision"], "updatedAt": product["updatedAt"],
+                }
+                for product in products
+            ],
+            "catalogVersion": metadata["catalogVersion"],
+            "freshness": metadata["freshness"],
+        }
+
+    catalog = search_catalog(connection, query)
+    results = []
+    for item in catalog["results"]:
+        if needs_price_attention and item["priceArs"] not in (None, 0):
+            continue
+        product = admin_product(connection, int(item["id"]))
+        if product is not None:
+            results.append(product)
+        if len(results) == ADMIN_SEARCH_LIMIT:
+            break
+    return {
+        "results": results,
+        "catalogVersion": catalog["catalogVersion"],
+        "freshness": catalog["freshness"],
     }

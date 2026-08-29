@@ -92,6 +92,10 @@ def test_pwa_static_assets_are_served_with_safe_scope_and_real_icons(client: Fla
         "/static/icons/icon-192.png",
         "/static/icons/icon-512.png",
         "/static/icons/icon-maskable-512.png",
+        "/static/images/scanner-no-match/01.png",
+        "/static/images/scanner-no-match/02.png",
+        "/static/images/scanner-no-match/04.png",
+        "/static/images/scanner-no-match/05.png",
     ):
         response = client.get(path, base_url=ORIGIN)
         assert response.status_code == 200

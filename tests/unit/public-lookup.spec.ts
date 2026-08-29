@@ -40,8 +40,9 @@ describe('public manual lookup page', () => {
     expect(page).toContain('No hay resultados relevantes.');
     expect(page).toContain("const SCANNER_NOT_FOUND_MESSAGE = 'Código no encontrado.'");
     expect(page).toContain("async function lookup(query, notFoundMessage = 'No hay resultados relevantes.')");
-    expect(page).toContain('hasLeadingZeroFallback ? null : SCANNER_NOT_FOUND_MESSAGE');
-    expect(page).toContain('return lookup(withoutLeadingZero, SCANNER_NOT_FOUND_MESSAGE);');
+    expect(page).toContain("form.addEventListener('submit', (event) => { event.preventDefault(); void lookup(input.value.trim()); });");
+    expect(page).toContain("lookup: (query) => lookup(query, null)");
+    expect(page).toContain('onFinalNotFound: showScannerNoMatch');
     expect(page).toContain("'catalog-miss': SCANNER_NOT_FOUND_MESSAGE");
     expect(page).toContain('No se pudo consultar.');
     expect(page).not.toContain('No se encontró un precio coincidente.');
@@ -92,8 +93,7 @@ describe('public manual lookup page', () => {
     expect(page).toContain("scan.setAttribute('aria-pressed', 'false');");
     expect(page).toContain("if (outcome === 'matched' || outcome === 'not-found') closeScanner(null, false)");
     expect(page).toContain('async function lookupScannedBarcode(text)');
-    expect(page).toContain("/^0[0-9]{13}$/.test(text)");
-    expect(page).toContain('const withoutLeadingZero = text.slice(1);');
+    expect(page).toContain("import { lookupScannedBarcode as runScannedBarcodeLookup } from './scanner-lookup.js';");
     expect(page).toContain("event: 'scanner-leading-zero-fallback'");
     expect(page).toContain("document.addEventListener('visibilitychange'");
     expect(page).toContain("window.addEventListener('pagehide'");
@@ -120,6 +120,24 @@ describe('public manual lookup page', () => {
     expect(page).toContain('status.hidden = false;');
     expect(page).toContain('<article id="result" class="result" aria-busy="false" hidden></article>');
     expect(page).not.toContain('Enter a code or article to see the current price.');
+  });
+
+  it('renders a centered, decorative Flork only through the scanner final-miss path', async () => {
+    const page = await publicSurface();
+
+    expect(page).toContain("import { pickScannerNoMatchImage } from './no-repeat-picker.js';");
+    expect(page).toContain('function showScannerNoMatch()');
+    expect(page).toContain("image.alt = '';");
+    expect(page).toContain("image.setAttribute('aria-hidden', 'true');");
+    expect(page).toContain("message.textContent = SCANNER_NOT_FOUND_MESSAGE;");
+    expect(page).toContain("message.setAttribute('aria-hidden', 'true');");
+    expect(page).toContain("setStatus(SCANNER_NOT_FOUND_MESSAGE, 'empty', true);");
+    expect(page).toContain('.result[data-state="scanner-no-match"] { display: grid;');
+    expect(page).toContain('.scanner-no-match { display: grid; inline-size: min(100%, 22rem);');
+    expect(page).toContain('inline-size: min(100%, 19rem, 42dvh);');
+    expect(page).toContain('aspect-ratio: 1;');
+    expect(page).toContain('object-fit: contain;');
+    expect(page).toContain('.status.sr-only {');
   });
 
   it('renders every ranked API result in an accessible ordered list', async () => {

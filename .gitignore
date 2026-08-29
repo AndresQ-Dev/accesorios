@@ -1,6 +1,7 @@
 # Local catalog inputs; never commit shop data or product-label photos.
 *.xlsx
 ejemplo_barras.jpeg
+flork/
 
 # Local AI/code intelligence metadata.
 .atl/

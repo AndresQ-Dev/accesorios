@@ -72,6 +72,10 @@ video { display: block; width: 100%; height: 100%; object-fit: cover; }
 .status[data-tone="error"] { color: var(--error); }
 .status[data-tone="success"] { color: var(--success); }
 .result { padding: 1.5rem 0 0; }
+.result[data-state="scanner-no-match"] { display: grid; min-block-size: min(48dvh, 31rem); place-items: start center; padding-block: clamp(1.25rem, 4dvh, 2.5rem) 0; }
+.scanner-no-match { display: grid; inline-size: min(100%, 22rem); max-block-size: min(58dvh, 32rem); gap: clamp(.75rem, 2dvh, 1.25rem); place-items: center; text-align: center; }
+.scanner-no-match-image { display: block; inline-size: min(100%, 19rem, 42dvh); aspect-ratio: 1; block-size: auto; max-inline-size: 100%; max-block-size: 42dvh; object-fit: contain; }
+.scanner-no-match-message { margin: 0; color: var(--brand); font-size: clamp(1.1rem, 4vw, 1.35rem); font-weight: 800; line-height: 1.35; }
 .result[data-loading="true"] div { width: 78%; height: 9rem; background: #e5e5e5; animation: pulse 900ms ease-in-out infinite alternate; }
 .results-heading { margin: 0; color: var(--brand); font-size: 1.25rem; line-height: 1.2; }
 .results { display: grid; gap: 1rem; margin: 1.25rem 0 0; padding-left: 0; list-style: none; }
@@ -84,4 +88,5 @@ video { display: block; width: 100%; height: 100%; object-fit: cover; }
 @media (min-width: 34rem) { .scanner[open] { width: min(92vw, 44rem); height: min(92dvh, 54rem); margin: auto; } }
 @media (max-height: 42rem) { main { padding-top: max(.85rem, env(safe-area-inset-top)); } .lookup-stage { min-height: 13.5rem; align-items: start; padding-top: .75rem; } .lookup-controls { gap: 1.35rem; } .scan { width: 5.35rem; min-width: 5.35rem; height: 5.35rem; min-height: 5.35rem; } .scan-logo { width: 3.55rem; height: 3.55rem; } }
 @media (max-height: 32rem) and (orientation: landscape) { main { padding-top: .75rem; padding-bottom: 1rem; } .lookup-stage { min-height: 8.75rem; padding-top: .25rem; } .lookup-controls { gap: .8rem; } .scan { width: 4.75rem; min-width: 4.75rem; height: 4.75rem; min-height: 4.75rem; } .scan-logo { width: 3.1rem; height: 3.1rem; } .price { font-size: 2rem; } .scanner[open] { width: min(92vw, 44rem); height: 94dvh; margin: auto; } .scanner-header h2 { font-size: 1rem; } .scanner-footer { padding-top: .45rem; } }
+.status.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; scroll-behavior: auto !important; } }

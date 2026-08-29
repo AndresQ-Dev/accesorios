@@ -110,7 +110,7 @@ curl -fsSI https://<origin>/static/scanner.js
 Confirm all of the following:
 
 - The WASM request succeeds and has `Content-Type: application/wasm`.
-- The service-worker body contains `CACHE_VERSION='precios-static-v2'` for the current release and the response has `Service-Worker-Allowed: /`.
+- The service-worker body contains `CACHE_VERSION='precios-static-v3'` for the current release and the response has `Service-Worker-Allowed: /`.
 - The scanner bundle request succeeds and serves the current build.
 - HTTPS `/login` works; `/` redirects without an application session.
 - `/admin` requires the application session first and then the independent admin login.

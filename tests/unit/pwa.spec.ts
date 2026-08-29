@@ -37,9 +37,15 @@ describe('PWA readiness', () => {
   });
 
   it('caches static assets only and leaves API plus navigations to the network', () => {
-    expect(serviceWorker).toContain("const CACHE_VERSION = 'precios-static-v2'");
-    expect(serviceWorker).not.toContain('precios-static-v1');
+    expect(serviceWorker).toContain("const CACHE_VERSION = 'precios-static-v3'");
+    expect(serviceWorker).not.toContain('precios-static-v2');
     expect(serviceWorker).toContain("'/static/vendor/zxing_reader.wasm'");
+    expect(serviceWorker).toContain("'/static/no-repeat-picker.js'");
+    expect(serviceWorker).toContain("'/static/scanner-lookup.js'");
+    expect(serviceWorker).toContain("'/static/images/scanner-no-match/01.png'");
+    expect(serviceWorker).toContain("'/static/images/scanner-no-match/02.png'");
+    expect(serviceWorker).toContain("'/static/images/scanner-no-match/04.png'");
+    expect(serviceWorker).toContain("'/static/images/scanner-no-match/05.png'");
     expect(serviceWorker).toContain("if (url.pathname.startsWith('/api/')) return;");
     expect(serviceWorker).toContain("if (request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html')) return;");
     expect(serviceWorker).toContain('if (!STATIC_ASSETS.includes(url.pathname)) return;');
@@ -56,7 +62,7 @@ describe('PWA readiness', () => {
       skipWaiting: vi.fn(),
     };
     const cacheStorage = {
-      keys: vi.fn().mockResolvedValue(['precios-static-v1', 'precios-static-v2']),
+      keys: vi.fn().mockResolvedValue(['precios-static-v1', 'precios-static-v2', 'precios-static-v3']),
       delete: vi.fn().mockResolvedValue(true),
     };
 
@@ -68,7 +74,8 @@ describe('PWA readiness', () => {
     await activation;
 
     expect(cacheStorage.delete).toHaveBeenCalledWith('precios-static-v1');
-    expect(cacheStorage.delete).not.toHaveBeenCalledWith('precios-static-v2');
+    expect(cacheStorage.delete).toHaveBeenCalledWith('precios-static-v2');
+    expect(cacheStorage.delete).not.toHaveBeenCalledWith('precios-static-v3');
     expect(worker.clients.claim).toHaveBeenCalledOnce();
   });
 });

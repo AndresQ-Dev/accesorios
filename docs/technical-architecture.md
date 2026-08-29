@@ -127,15 +127,15 @@ Código detectado
   ├─ no es 13/14 dígitos -> continúa escaneando
   ├─ es 13 dígitos, o 14 sin cero inicial -> consulta original
   │     ├─ match -> muestra resultado y cierra scanner
-  │     └─ miss -> cierra scanner: “Código no encontrado.”
+│     └─ miss -> cierra scanner: Flork aleatorio + “Código no encontrado.”
   └─ es 14 dígitos y empieza con 0 -> consulta original en silencio
         ├─ match -> muestra resultado y cierra scanner
         └─ miss -> reintenta una vez sin el primer 0
               ├─ match -> muestra resultado y cierra scanner
-              └─ miss -> cierra scanner: “Código no encontrado.”
+              └─ miss -> cierra scanner: Flork aleatorio + “Código no encontrado.”
 ```
 
-El primer fallo de un código de 14 dígitos con cero inicial no muestra el estado de “sin resultados” mientras espera el fallback. El diagnóstico del scanner no registra el barcode completo.
+El primer fallo de un código de 14 dígitos con cero inicial no muestra el estado de “sin resultados” mientras espera el fallback. El estado visual final usa una imagen decorativa aleatoria y no repetida hasta agotar el manifiesto; la frase permanece accesible una sola vez mediante el estado existente. No se muestra para búsquedas manuales, frames ilegibles, errores de cámara/permisos/red, cancelación ni coincidencias. El diagnóstico del scanner no registra el barcode completo.
 
 ### Editor de producto
 
@@ -182,7 +182,7 @@ No copiar solamente `catalog.sqlite` de una instancia viva con WAL: usar el back
 
 ## PWA y ciclo de cache
 
-`app/static/service-worker.js` usa `CACHE_VERSION='precios-static-v2'`. Durante instalación precachea **sólo** su lista cerrada de assets estáticos. El fetch handler deja HTML, navegaciones, `/api/`, otros orígenes y recursos fuera de esa lista en red; no hay cache de datos o páginas privadas.
+`app/static/service-worker.js` usa `CACHE_VERSION='precios-static-v3'`. Durante instalación precachea **sólo** su lista cerrada de assets estáticos, incluidos el picker y las cuatro imágenes no repetidas del estado final del scanner. El fetch handler deja HTML, navegaciones, `/api/`, otros orígenes y recursos fuera de esa lista en red; no hay cache de datos o páginas privadas.
 
 Al agregar o cambiar un asset precacheado:
 

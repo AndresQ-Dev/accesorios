@@ -1,4 +1,6 @@
 import { createBrowserScanner } from './scanner.js';
+import { pickScannerNoMatchImage } from './no-repeat-picker.js';
+import { lookupScannedBarcode as runScannedBarcodeLookup } from './scanner-lookup.js';
 
 const form = document.querySelector('#lookup-form');
 const input = document.querySelector('#query');
@@ -41,7 +43,8 @@ function formatArgentinaDateTime(value) {
   return `${formatted.replace(',', '')} hs`;
 }
 
-function setStatus(message, tone = 'info') {
+function setStatus(message, tone = 'info', visuallyHidden = false) {
+  status.classList.toggle('sr-only', visuallyHidden);
   if (!status.hidden && status.textContent === message && status.dataset.tone === tone) return;
   status.textContent = message;
   status.dataset.tone = tone;
@@ -50,6 +53,7 @@ function setStatus(message, tone = 'info') {
 
 function showLoading() {
   result.hidden = false;
+  delete result.dataset.state;
   result.dataset.loading = 'true';
   result.setAttribute('aria-busy', 'true');
   result.replaceChildren(document.createElement('div'));
@@ -58,6 +62,7 @@ function showLoading() {
 
 function showResults(items, freshness) {
   if (scanDebugEnabled) scanDebugPanel.hidden = true;
+  delete result.dataset.state;
   const heading = document.createElement('h2'); heading.className = 'results-heading';
   heading.textContent = `${items.length} ${items.length === 1 ? 'resultado' : 'resultados'}`;
   const list = document.createElement('ol'); list.className = 'results'; list.setAttribute('aria-label', 'Resultados de búsqueda ordenados');
@@ -73,6 +78,31 @@ function showResults(items, freshness) {
   updated.textContent = freshness ? `Actualizado: ${formatArgentinaDateTime(freshness)}` : 'Sin actualización.';
   result.dataset.loading = 'false'; result.setAttribute('aria-busy', 'false'); result.replaceChildren(heading, list, updated);
   setStatus(`${items.length} ${items.length === 1 ? 'resultado' : 'resultados'}.`, 'success');
+}
+
+function showScannerNoMatch() {
+  const image = document.createElement('img');
+  image.className = 'scanner-no-match-image';
+  image.src = pickScannerNoMatchImage();
+  image.alt = '';
+  image.setAttribute('aria-hidden', 'true');
+  image.decoding = 'async';
+
+  const message = document.createElement('p');
+  message.className = 'scanner-no-match-message';
+  message.textContent = SCANNER_NOT_FOUND_MESSAGE;
+  message.setAttribute('aria-hidden', 'true');
+
+  const content = document.createElement('div');
+  content.className = 'scanner-no-match';
+  content.replaceChildren(image, message);
+
+  result.hidden = false;
+  result.dataset.state = 'scanner-no-match';
+  result.dataset.loading = 'false';
+  result.setAttribute('aria-busy', 'false');
+  result.replaceChildren(content);
+  setStatus(SCANNER_NOT_FOUND_MESSAGE, 'empty', true);
 }
 
 function reportScannerDebug(event) {
@@ -104,25 +134,29 @@ async function lookup(query, notFoundMessage = 'No hay resultados relevantes.') 
     if (response.status === 400) throw new Error('invalid-query');
     if (!response.ok) throw new Error('server-failure');
     const data = await response.json();
-    if (data.results.length === 0) { result.hidden = true; if (notFoundMessage) setStatus(notFoundMessage, 'empty'); return 'not-found'; }
+    if (data.results.length === 0) {
+      result.hidden = true;
+      delete result.dataset.state;
+      if (notFoundMessage) setStatus(notFoundMessage, 'empty');
+      return 'not-found';
+    }
     showResults(data.results, data.freshness);
     return 'matched';
   } catch (error) {
     result.hidden = true;
+    delete result.dataset.state;
     setStatus(error instanceof Error && error.message === 'invalid-query' ? 'Código o artículo inválido.' : 'No se pudo consultar.', 'error');
     return 'retry';
   } finally { submit.disabled = false; result.setAttribute('aria-busy', 'false'); }
 }
 
 async function lookupScannedBarcode(text) {
-  input.value = text;
-  const hasLeadingZeroFallback = /^0[0-9]{13}$/.test(text);
-  const outcome = await lookup(text, hasLeadingZeroFallback ? null : SCANNER_NOT_FOUND_MESSAGE);
-  if (outcome !== 'not-found' || !hasLeadingZeroFallback) return outcome;
-  const withoutLeadingZero = text.slice(1);
-  reportScannerDebug({ event: 'scanner-leading-zero-fallback', details: { originalLength: text.length, retryLength: withoutLeadingZero.length } });
-  input.value = withoutLeadingZero;
-  return lookup(withoutLeadingZero, SCANNER_NOT_FOUND_MESSAGE);
+  return runScannedBarcodeLookup(text, {
+    lookup: (query) => lookup(query, null),
+    setInput: (value) => { input.value = value; },
+    onLeadingZeroFallback: (details) => reportScannerDebug({ event: 'scanner-leading-zero-fallback', details }),
+    onFinalNotFound: showScannerNoMatch,
+  });
 }
 
 function scannerState(state) {
@@ -136,6 +170,10 @@ function scannerState(state) {
     'catalog-miss': SCANNER_NOT_FOUND_MESSAGE,
     unreadable: 'No se pudo leer. Reencuadre.',
   };
+  if (state === 'catalog-miss' && result.dataset.state === 'scanner-no-match') {
+    scannerStatus.textContent = messages[state];
+    return;
+  }
   setStatus(messages[state], state === 'scanning' ? 'info' : state === 'catalog-miss' || state === 'unreadable' ? 'empty' : 'error');
   scannerStatus.textContent = messages[state];
   if (!['scanning', 'slow', 'catalog-miss', 'unreadable'].includes(state)) scanner.stop();

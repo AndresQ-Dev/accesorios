@@ -31,7 +31,7 @@ Use local-only passwords and hashes. `COOKIE_SECURE=false` is only for local HTT
 | Area | Everyday flow |
 |---|---|
 | Price lookup | Sign in at `/login`, then search from `/` by code, barcode, article, brand, or category. A manual empty result says `No hay resultados relevantes.` |
-| Scanner | Open the camera from `/`. It accepts plausible 13/14-digit scans and looks up the code without uploading camera frames. A final miss says `Código no encontrado.` |
+| Scanner | Open the camera from `/`. It accepts plausible 13/14-digit scans and looks up the code without uploading camera frames. A final catalog miss closes the camera and shows a non-repeating Flork with `Código no encontrado.`; manual no-results stay text-only. |
 | Admin editor | Open `/admin` after the application login, then complete the separate admin login. Search products, optionally filter records with a missing or zero price, load one record, and edit code, barcode, article, or price. A blank price is stored as no price and shown as `Sin precio`. |
 | XLSX import | In the same admin area, upload an XLSX to create a persistent, expiring preview, then confirm it. Confirmation verifies the preview hash and catalog version, creates a SQLite backup, and applies changes atomically. |
 

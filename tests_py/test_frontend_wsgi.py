@@ -92,14 +92,16 @@ def test_pwa_static_assets_are_served_with_safe_scope_and_real_icons(client: Fla
         "/static/icons/icon-192.png",
         "/static/icons/icon-512.png",
         "/static/icons/icon-maskable-512.png",
-        "/static/images/scanner-no-match/01.png",
-        "/static/images/scanner-no-match/02.png",
-        "/static/images/scanner-no-match/04.png",
-        "/static/images/scanner-no-match/05.png",
+        "/static/images/scanner-no-match/01.webp",
+        "/static/images/scanner-no-match/02.webp",
+        "/static/images/scanner-no-match/04.webp",
+        "/static/images/scanner-no-match/05.webp",
     ):
         response = client.get(path, base_url=ORIGIN)
         assert response.status_code == 200
         assert len(response.data) > 100
+        if path.endswith(".webp"):
+            assert response.mimetype == "image/webp"
 
 
 def test_wsgi_security_headers_are_applied(client: FlaskClient) -> None:

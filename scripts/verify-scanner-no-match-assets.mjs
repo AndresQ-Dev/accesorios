@@ -12,8 +12,8 @@ async function pixel(path, x, y) {
 }
 
 async function metadata(path) {
-  const { stdout } = await execFile('magick', ['identify', '-format', '%w %h %[channels]', path]);
-  return stdout.trim().split(' ');
+  const { stdout } = await execFile('magick', ['identify', '-format', '%w|%h|%[channels]|%m', path]);
+  return stdout.trim().split('|');
 }
 
 async function alphaMaximum(path) {
@@ -28,14 +28,14 @@ if (new Set(SCANNER_NO_MATCH_IMAGES).size !== SCANNER_NO_MATCH_IMAGES.length) {
 for (const asset of SCANNER_NO_MATCH_IMAGES) {
   const path = fileURLToPath(new URL(`../app${asset}`, import.meta.url));
   await access(path);
-  const [width, height, channels] = await metadata(path);
+  const [width, height, channels, format] = await metadata(path);
   const corner = await pixel(path, 0, 0);
   const maximumAlpha = await alphaMaximum(path);
-  if (width !== '512' || height !== '512' || !channels.includes('rgba')) {
-    throw new Error(`${asset} must be a 512x512 RGBA PNG, received ${width}x${height} ${channels}.`);
+  if (width !== '512' || height !== '512' || !channels.includes('rgba') || format !== 'WEBP') {
+    throw new Error(`${asset} must be a 512x512 RGBA WebP, received ${width}x${height} ${channels} ${format}.`);
   }
   if (!/,0\)$/.test(corner)) throw new Error(`${asset} must have a transparent corner, received ${corner}.`);
   if (maximumAlpha !== 1) throw new Error(`${asset} must retain an opaque foreground pixel, received alpha maximum ${maximumAlpha}.`);
 }
 
-console.log(`Verified ${SCANNER_NO_MATCH_IMAGES.length} 512x512 RGBA scanner no-match PNG assets.`);
+console.log(`Verified ${SCANNER_NO_MATCH_IMAGES.length} 512x512 RGBA scanner no-match WebP assets.`);

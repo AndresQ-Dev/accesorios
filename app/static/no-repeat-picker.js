@@ -1,8 +1,8 @@
 export const SCANNER_NO_MATCH_IMAGES = Object.freeze([
-  '/static/images/scanner-no-match/01.png',
-  '/static/images/scanner-no-match/02.png',
-  '/static/images/scanner-no-match/04.png',
-  '/static/images/scanner-no-match/05.png',
+  '/static/images/scanner-no-match/01.webp',
+  '/static/images/scanner-no-match/02.webp',
+  '/static/images/scanner-no-match/04.webp',
+  '/static/images/scanner-no-match/05.webp',
 ]);
 
 export function createNoRepeatPicker(manifest, random = Math.random) {

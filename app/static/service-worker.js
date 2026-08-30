@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'precios-static-v3';
+const CACHE_VERSION = 'precios-static-v4';
 const STATIC_ASSETS = [
   '/static/admin.css',
   '/static/admin.js',
@@ -10,10 +10,10 @@ const STATIC_ASSETS = [
   '/static/icons/icon-maskable-512.png',
   '/static/index.css',
   '/static/index.js',
-  '/static/images/scanner-no-match/01.png',
-  '/static/images/scanner-no-match/02.png',
-  '/static/images/scanner-no-match/04.png',
-  '/static/images/scanner-no-match/05.png',
+  '/static/images/scanner-no-match/01.webp',
+  '/static/images/scanner-no-match/02.webp',
+  '/static/images/scanner-no-match/04.webp',
+  '/static/images/scanner-no-match/05.webp',
   '/static/login.js',
   '/static/manifest.webmanifest',
   '/static/pwa.js',

@@ -24,6 +24,12 @@ const STATIC_ASSETS = [
   '/static/vendor/zxing_reader.wasm',
 ];
 
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_VERSION)

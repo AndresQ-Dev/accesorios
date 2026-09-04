@@ -14,6 +14,7 @@ class ApiError(Exception):
     code: str
     message: str
     fields: dict[str, str] | None = None
+    headers: dict[str, str] | None = None
 
 
 def request_id() -> str:
@@ -38,7 +39,10 @@ def error_payload(error: ApiError) -> dict[str, Any]:
 def register_error_handlers(app: Flask) -> None:
     @app.errorhandler(ApiError)
     def handle_api_error(error: ApiError):  # type: ignore[no-untyped-def]
-        return jsonify(error_payload(error)), error.status
+        response = jsonify(error_payload(error))
+        for name, value in (error.headers or {}).items():
+            response.headers[name] = value
+        return response, error.status
 
     @app.errorhandler(RequestEntityTooLarge)
     def handle_too_large(_error: RequestEntityTooLarge):  # type: ignore[no-untyped-def]

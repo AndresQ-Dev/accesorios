@@ -1,3 +1,5 @@
+import { FetchTimeoutError, fetchWithTimeout } from './fetch-with-timeout.js';
+
 const form = document.querySelector('#app-login-form');
 const password = document.querySelector('#app-password');
 const submit = document.querySelector('#app-login-submit');
@@ -16,7 +18,7 @@ form.addEventListener('submit', async (event) => {
   submit.disabled = true;
   showStatus('Ingresando…');
   try {
-    const response = await fetch('/api/v1/login', {
+    const response = await fetchWithTimeout('/api/v1/login', {
       method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ password: password.value }),
     });
@@ -24,6 +26,8 @@ form.addEventListener('submit', async (event) => {
       const payload = await response.json().catch(() => ({}));
       const message = payload.error?.code === 'LOGIN_THROTTLED'
         ? 'Espere unos minutos.'
+        : payload.error?.code === 'LOGIN_BUSY'
+        ? 'El acceso está ocupado. Intente nuevamente.'
         : payload.error?.code === 'INVALID_APP_PASSWORD'
         ? 'Acceso inválido.'
         : 'No se pudo ingresar.';
@@ -32,7 +36,12 @@ form.addEventListener('submit', async (event) => {
     const next = new URLSearchParams(window.location.search).get('next');
     window.location.assign(next?.startsWith('/') && !next.startsWith('//') ? next : '/');
   } catch (error) {
-    showStatus(error instanceof Error ? error.message : 'No se pudo ingresar.', 'error');
+    showStatus(
+      error instanceof FetchTimeoutError
+        ? 'La solicitud demoró demasiado. Intente nuevamente.'
+        : error instanceof Error ? error.message : 'No se pudo ingresar.',
+      'error',
+    );
     password.select();
   } finally {
     submit.disabled = false;

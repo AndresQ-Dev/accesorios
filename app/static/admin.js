@@ -1,3 +1,5 @@
+import { FetchTimeoutError, fetchWithTimeout } from './fetch-with-timeout.js';
+
 const loginForm = document.querySelector('#login-form');
 const password = document.querySelector('#password');
 const loginButton = document.querySelector('#login-submit');
@@ -43,6 +45,7 @@ const spanishError = {
   INVALID_APP_PASSWORD: 'Acceso inválido.',
   UNAUTHENTICATED: 'Sesión vencida.',
   LOGIN_THROTTLED: 'Espere unos minutos.',
+  LOGIN_BUSY: 'El acceso está ocupado. Intente nuevamente.',
   INVALID_ORIGIN: 'No se pudo completar.',
   INVALID_CSRF: 'Sesión vencida.',
   INVALID_QUERY: 'Ingrese un código, código de barras o artículo.',
@@ -218,7 +221,7 @@ productEditor?.addEventListener('submit', async (event) => {
 loginForm.addEventListener('submit', async (event) => {
   event.preventDefault(); if (busy) return; setBusy(true); showStatus('Ingresando…');
   try {
-    const response = await fetch('/api/v1/admin/login', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: password.value }) });
+    const response = await fetchWithTimeout('/api/v1/admin/login', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: password.value }) });
     if (!response.ok) throw new Error((await responseError(response)).message);
     const payload = await response.json();
     if (typeof payload.csrfToken !== 'string') throw new Error('No se pudo completar.');
@@ -227,7 +230,10 @@ loginForm.addEventListener('submit', async (event) => {
     importPanel.hidden = false;
     catalogPanel.hidden = false;
     showStatus('Seleccione XLSX.', 'success'); fileInput.focus();
-  } catch (error) { showStatus(error instanceof Error ? error.message : 'No se pudo completar.', 'error'); password.focus(); }
+  } catch (error) {
+    showStatus(error instanceof FetchTimeoutError ? 'La solicitud demoró demasiado. Intente nuevamente.' : error instanceof Error ? error.message : 'No se pudo completar.', 'error');
+    password.select(); password.focus();
+  }
   finally { setBusy(false); }
 });
 

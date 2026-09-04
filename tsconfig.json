@@ -19,6 +19,7 @@
     "tests/unit/public-lookup.spec.ts",
     "tests/unit/pwa.spec.ts",
     "tests/unit/scanner-layout.spec.ts",
-    "tests/unit/admin-import-layout.spec.ts"
+    "tests/unit/admin-import-layout.spec.ts",
+    "tests/unit/login-resilience.spec.ts"
   ]
 }

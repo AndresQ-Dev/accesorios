@@ -182,7 +182,7 @@ No copiar solamente `catalog.sqlite` de una instancia viva con WAL: usar el back
 
 ## PWA y ciclo de cache
 
-`app/static/service-worker.js` usa `CACHE_VERSION='precios-static-v3'`. Durante instalación precachea **sólo** su lista cerrada de assets estáticos, incluidos el picker y las cuatro imágenes no repetidas del estado final del scanner. El fetch handler deja HTML, navegaciones, `/api/`, otros orígenes y recursos fuera de esa lista en red; no hay cache de datos o páginas privadas.
+`app/static/service-worker.js` usa `CACHE_VERSION='precios-static-v5'`. Durante instalación precachea **sólo** su lista cerrada de assets estáticos, incluidos el picker y las cuatro imágenes no repetidas del estado final del scanner. El fetch handler deja HTML, navegaciones, `/api/`, otros orígenes y recursos fuera de esa lista en red; no hay cache de datos o páginas privadas.
 
 Al agregar o cambiar un asset precacheado:
 

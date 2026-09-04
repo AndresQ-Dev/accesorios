@@ -1,9 +1,10 @@
-const CACHE_VERSION = 'precios-static-v4';
+const CACHE_VERSION = 'precios-static-v5';
 const STATIC_ASSETS = [
   '/static/admin.css',
   '/static/admin.js',
   '/static/favicon.ico',
   '/static/favicon.svg',
+  '/static/fetch-with-timeout.js',
   '/static/icons/apple-touch-icon.png',
   '/static/icons/icon-192.png',
   '/static/icons/icon-512.png',

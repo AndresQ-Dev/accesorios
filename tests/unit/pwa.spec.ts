@@ -37,8 +37,9 @@ describe('PWA readiness', () => {
   });
 
   it('caches static assets only and leaves API plus navigations to the network', () => {
-    expect(serviceWorker).toContain("const CACHE_VERSION = 'precios-static-v4'");
-    expect(serviceWorker).not.toContain('precios-static-v3');
+    expect(serviceWorker).toContain("const CACHE_VERSION = 'precios-static-v5'");
+    expect(serviceWorker).not.toContain('precios-static-v4');
+    expect(serviceWorker).toContain("'/static/fetch-with-timeout.js'");
     expect(serviceWorker).toContain("'/static/vendor/zxing_reader.wasm'");
     expect(serviceWorker).toContain("'/static/no-repeat-picker.js'");
     expect(serviceWorker).toContain("'/static/scanner-lookup.js'");
@@ -62,7 +63,7 @@ describe('PWA readiness', () => {
       skipWaiting: vi.fn(),
     };
     const cacheStorage = {
-      keys: vi.fn().mockResolvedValue(['precios-static-v1', 'precios-static-v2', 'precios-static-v3', 'precios-static-v4']),
+      keys: vi.fn().mockResolvedValue(['precios-static-v1', 'precios-static-v2', 'precios-static-v3', 'precios-static-v4', 'precios-static-v5']),
       delete: vi.fn().mockResolvedValue(true),
     };
 
@@ -76,7 +77,8 @@ describe('PWA readiness', () => {
     expect(cacheStorage.delete).toHaveBeenCalledWith('precios-static-v1');
     expect(cacheStorage.delete).toHaveBeenCalledWith('precios-static-v2');
     expect(cacheStorage.delete).toHaveBeenCalledWith('precios-static-v3');
-    expect(cacheStorage.delete).not.toHaveBeenCalledWith('precios-static-v4');
+    expect(cacheStorage.delete).toHaveBeenCalledWith('precios-static-v4');
+    expect(cacheStorage.delete).not.toHaveBeenCalledWith('precios-static-v5');
     expect(worker.clients.claim).toHaveBeenCalledOnce();
   });
 });

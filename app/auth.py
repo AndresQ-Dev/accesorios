@@ -5,21 +5,24 @@ import hashlib
 import hmac
 import json
 import secrets
-import sqlite3
-from datetime import UTC, datetime, timedelta
-from time import perf_counter
+import threading
+from collections import OrderedDict, deque
+from time import monotonic, perf_counter
 from typing import Any, Literal
 
 from flask import Response, current_app, request
-from sqlalchemy import Connection, text
-from sqlalchemy.exc import OperationalError
+from itsdangerous import BadData, URLSafeTimedSerializer
 
-from app.db import read_connection, write_connection
 from app.errors import ApiError, request_id
 
 MIN_PBKDF2_ITERATIONS = 600_000
 PASSWORD_PREFIX = "pbkdf2-sha256"
 SessionKind = Literal["app", "admin"]
+ThrottleKey = tuple[SessionKind, str]
+
+_MAX_THROTTLE_CLIENTS = 4096
+_throttle_attempts: OrderedDict[ThrottleKey, deque[float]] = OrderedDict()
+_throttle_lock = threading.Lock()
 
 
 def _b64url_encode(value: bytes) -> str:
@@ -58,14 +61,6 @@ def token_hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def _now() -> datetime:
-    return datetime.now(UTC)
-
-
-def _timestamp(value: datetime) -> str:
-    return value.isoformat(timespec="milliseconds").replace("+00:00", "Z")
-
-
 def _same_origin() -> None:
     origin = request.headers.get("Origin", "").rstrip("/")
     expected = current_app.config["TRUSTED_ORIGIN"] or request.host_url.rstrip("/")
@@ -95,48 +90,78 @@ def _client_key() -> str:
     return hashlib.sha256(address.encode()).hexdigest()
 
 
-def _precheck_throttle(connection: Connection, scope: str, key: str) -> None:
-    cutoff = _timestamp(_now() - timedelta(seconds=current_app.config["LOGIN_WINDOW_SECONDS"]))
-    count = connection.execute(
-        text(
-            "SELECT COUNT(*) FROM login_attempts "
-            "WHERE scope = :scope AND client_key = :key AND attempted_at > :cutoff"
-        ),
-        {"scope": scope, "key": key, "cutoff": cutoff},
-    ).scalar_one()
-    if count >= current_app.config["LOGIN_MAX_ATTEMPTS"]:
-        raise ApiError(429, "LOGIN_THROTTLED", "Login is temporarily unavailable. Try again later.")
+def _throttle_now() -> float:
+    return monotonic()
 
 
-def _check_throttle(connection: Connection, scope: str, key: str) -> None:
-    cutoff = _timestamp(_now() - timedelta(seconds=current_app.config["LOGIN_WINDOW_SECONDS"]))
-    connection.execute(text("DELETE FROM login_attempts WHERE attempted_at <= :cutoff"), {"cutoff": cutoff})
-    count = connection.execute(
-        text("SELECT COUNT(*) FROM login_attempts WHERE scope = :scope AND client_key = :key"),
-        {"scope": scope, "key": key},
-    ).scalar_one()
-    if count >= current_app.config["LOGIN_MAX_ATTEMPTS"]:
-        raise ApiError(429, "LOGIN_THROTTLED", "Login is temporarily unavailable. Try again later.")
+def _prune_throttle(now: float, window_seconds: int) -> None:
+    cutoff = now - window_seconds
+    for throttle_key, attempts in list(_throttle_attempts.items()):
+        while attempts and attempts[0] <= cutoff:
+            attempts.popleft()
+        if not attempts:
+            del _throttle_attempts[throttle_key]
+    while len(_throttle_attempts) > _MAX_THROTTLE_CLIENTS:
+        _throttle_attempts.popitem(last=False)
 
 
-def _record_failed_login(connection: Connection, scope: str, key: str) -> None:
-    connection.execute(
-        text("INSERT INTO login_attempts (scope, client_key, attempted_at) VALUES (:scope, :key, :at)"),
-        {"scope": scope, "key": key, "at": _timestamp(_now())},
+def _raise_throttled() -> None:
+    raise ApiError(429, "LOGIN_THROTTLED", "Login is temporarily unavailable. Try again later.")
+
+
+def _precheck_throttle(kind: SessionKind, key: str) -> None:
+    now = _throttle_now()
+    with _throttle_lock:
+        _prune_throttle(now, current_app.config["LOGIN_WINDOW_SECONDS"])
+        attempts = _throttle_attempts.get((kind, key))
+        if attempts is not None and len(attempts) >= current_app.config["LOGIN_MAX_ATTEMPTS"]:
+            _raise_throttled()
+
+
+def _finalize_throttle(kind: SessionKind, key: str, authenticated: bool) -> None:
+    now = _throttle_now()
+    throttle_key = (kind, key)
+    with _throttle_lock:
+        _prune_throttle(now, current_app.config["LOGIN_WINDOW_SECONDS"])
+        attempts = _throttle_attempts.get(throttle_key)
+        if attempts is not None and len(attempts) >= current_app.config["LOGIN_MAX_ATTEMPTS"]:
+            _raise_throttled()
+        if authenticated:
+            _throttle_attempts.pop(throttle_key, None)
+            return
+        if attempts is None:
+            while len(_throttle_attempts) >= _MAX_THROTTLE_CLIENTS:
+                _throttle_attempts.popitem(last=False)
+            attempts = deque()
+            _throttle_attempts[throttle_key] = attempts
+        attempts.append(now)
+        _throttle_attempts.move_to_end(throttle_key)
+
+
+def _reset_login_throttle() -> None:
+    with _throttle_lock:
+        _throttle_attempts.clear()
+
+
+def _session_serializer(kind: SessionKind) -> URLSafeTimedSerializer:
+    config_name = "APP_PASSWORD_HASH" if kind == "app" else "ADMIN_PASSWORD_HASH"
+    credential_hash = current_app.config[config_name]
+    signing_key = hashlib.sha256(
+        b"precios-session-signing-v1\0" + kind.encode() + b"\0" + credential_hash.encode()
+    ).digest()
+    return URLSafeTimedSerializer(
+        signing_key,
+        salt=f"precios-{kind}-session-v1",
+        signer_kwargs={"digest_method": hashlib.sha256},
     )
 
 
-def _clear_login_attempts(connection: Connection, scope: str, key: str) -> None:
-    connection.execute(
-        text("DELETE FROM login_attempts WHERE scope = :scope AND client_key = :key"),
-        {"scope": scope, "key": key},
+def _issue_session(kind: SessionKind) -> tuple[str, str]:
+    csrf_token = secrets.token_urlsafe(32)
+    token = _session_serializer(kind).dumps(
+        {"kind": kind, "csrf": csrf_token, "session": secrets.token_urlsafe(32)}
     )
-
-
-def _is_sqlite_busy(error: OperationalError) -> bool:
-    return isinstance(error.orig, sqlite3.OperationalError) and (
-        "locked" in str(error.orig).lower() or "busy" in str(error.orig).lower()
-    )
+    return token, csrf_token
 
 
 def login(kind: SessionKind) -> tuple[dict[str, str], str, int]:
@@ -149,20 +174,18 @@ def login(kind: SessionKind) -> tuple[dict[str, str], str, int]:
     started_at = perf_counter()
     precheck_seconds = 0.0
     verification_seconds = 0.0
-    write_seconds = 0.0
+    finalize_seconds = 0.0
+    token_seconds = 0.0
     result = "failed"
-    scope = f"{kind}-login"
     key = _client_key()
     config_name = "APP_PASSWORD_HASH" if kind == "app" else "ADMIN_PASSWORD_HASH"
-    session_table = "app_sessions" if kind == "app" else "admin_sessions"
     token = ""
     csrf_token = ""
 
     try:
         phase_started_at = perf_counter()
         try:
-            with read_connection() as connection:
-                _precheck_throttle(connection, scope, key)
+            _precheck_throttle(kind, key)
         finally:
             precheck_seconds = perf_counter() - phase_started_at
 
@@ -174,28 +197,9 @@ def login(kind: SessionKind) -> tuple[dict[str, str], str, int]:
 
         phase_started_at = perf_counter()
         try:
-            with write_connection() as connection:
-                _check_throttle(connection, scope, key)
-                if not authenticated:
-                    _record_failed_login(connection, scope, key)
-                else:
-                    _clear_login_attempts(connection, scope, key)
-                    connection.execute(
-                        text(f"DELETE FROM {session_table} WHERE expires_at <= :now"),
-                        {"now": _timestamp(_now())},
-                    )
-                    token = secrets.token_urlsafe(32)
-                    csrf_token = secrets.token_urlsafe(32)
-                    expires_at = _now() + timedelta(seconds=current_app.config["SESSION_SECONDS"])
-                    connection.execute(
-                        text(
-                            f"INSERT INTO {session_table} (token_hash, csrf_token, expires_at) "
-                            "VALUES (:hash, :csrf, :expires)"
-                        ),
-                        {"hash": token_hash(token), "csrf": csrf_token, "expires": _timestamp(expires_at)},
-                    )
+            _finalize_throttle(kind, key, authenticated)
         finally:
-            write_seconds = perf_counter() - phase_started_at
+            finalize_seconds = perf_counter() - phase_started_at
 
         if not authenticated:
             result = "invalid-password"
@@ -203,30 +207,27 @@ def login(kind: SessionKind) -> tuple[dict[str, str], str, int]:
             message = "Invalid credentials." if kind == "app" else "Invalid administrator credentials."
             raise ApiError(401, code, message)
 
+        phase_started_at = perf_counter()
+        try:
+            token, csrf_token = _issue_session(kind)
+        finally:
+            token_seconds = perf_counter() - phase_started_at
+
         result = "success"
         return {"csrfToken": csrf_token}, token, current_app.config["SESSION_SECONDS"]
-    except OperationalError as error:
-        if _is_sqlite_busy(error):
-            result = "busy"
-            raise ApiError(
-                503,
-                "LOGIN_BUSY",
-                "Login is temporarily unavailable. Try again later.",
-                headers={"Retry-After": "2"},
-            ) from error
-        result = "database-error"
-        raise
     except ApiError as error:
         if error.code == "LOGIN_THROTTLED":
             result = "throttled"
         raise
     finally:
         current_app.logger.info(
-            "LOGIN_TIMING precheck_ms=%.3f verify_ms=%.3f write_ms=%.3f total_ms=%.3f "
+            "LOGIN_TIMING throttle_precheck_ms=%.3f password_verify_ms=%.3f "
+            "throttle_finalize_ms=%.3f token_issue_ms=%.3f total_ms=%.3f "
             "session_kind=%s result=%s request_id=%s",
             precheck_seconds * 1000,
             verification_seconds * 1000,
-            write_seconds * 1000,
+            finalize_seconds * 1000,
+            token_seconds * 1000,
             (perf_counter() - started_at) * 1000,
             kind,
             result,
@@ -253,23 +254,24 @@ def _session(kind: SessionKind) -> dict[str, str]:
     if not token:
         label = "Application" if kind == "app" else "Administrator"
         raise ApiError(401, "UNAUTHENTICATED", f"{label} authentication is required.")
-    table = "app_sessions" if kind == "app" else "admin_sessions"
-    with read_connection() as connection:
-        row = (
-            connection.execute(
-                text(
-                    f"SELECT token_hash, csrf_token FROM {table} "
-                    "WHERE token_hash = :hash AND expires_at > :now"
-                ),
-                {"hash": token_hash(token), "now": _timestamp(_now())},
-            )
-            .mappings()
-            .one_or_none()
+    try:
+        payload = _session_serializer(kind).loads(
+            token,
+            max_age=current_app.config["SESSION_SECONDS"],
         )
-    if row is None:
+    except BadData:
+        label = "Application" if kind == "app" else "Administrator"
+        raise ApiError(401, "UNAUTHENTICATED", f"{label} authentication is required.") from None
+    if (
+        not isinstance(payload, dict)
+        or set(payload) != {"kind", "csrf", "session"}
+        or payload.get("kind") != kind
+        or not isinstance(payload.get("csrf"), str)
+        or not isinstance(payload.get("session"), str)
+    ):
         label = "Application" if kind == "app" else "Administrator"
         raise ApiError(401, "UNAUTHENTICATED", f"{label} authentication is required.")
-    return {"tokenHash": row["token_hash"], "csrfToken": row["csrf_token"]}
+    return {"tokenHash": token_hash(token), "csrfToken": payload["csrf"]}
 
 
 def require_app(*, csrf: bool = False) -> str:

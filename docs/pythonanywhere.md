@@ -33,7 +33,7 @@ os.environ["TRUSTED_ORIGIN"] = "https://<user>.pythonanywhere.com"
 os.environ["COOKIE_SECURE"] = "true"
 ```
 
-Optional operational values are `SESSION_SECONDS`, `PREVIEW_SECONDS`, `BACKUP_RETENTION_COUNT`, and `BACKUP_RETENTION_BYTES`. Do **not** configure `FLASK_SECRET_KEY`: this application does not read it.
+Optional operational values are `SESSION_SECONDS`, `PREVIEW_SECONDS`, `LOGIN_WINDOW_SECONDS`, `LOGIN_MAX_ATTEMPTS`, `BACKUP_RETENTION_COUNT`, and `BACKUP_RETENTION_BYTES`. Do **not** configure `FLASK_SECRET_KEY`: session signing keys are derived privately from the existing password hashes, and this application does not read Flask's secret-key setting.
 
 Generate password hashes privately:
 
@@ -79,6 +79,8 @@ flask --app wsgi:application db-upgrade
 flask --app wsgi:application db-validate
 ```
 
+For the first deployment that converts an existing WAL database, use a quiet maintenance window. Create the verified backup first, then stop the Web app long enough to retire every old pooled SQLite connection before running `db-upgrade` and `db-validate` from one console. Re-enable/reload the Web app only after both commands succeed. If the journal transition reports a lock or a mode other than `delete`, leave the database and its sidecars untouched, confirm that no old web worker, task, console, or importer still has the database open, and run the command again only after the database is uncontended.
+
 Build and deploy scanner assets with the matching source revision. If Node is available on the deployment host:
 
 ```bash
@@ -92,9 +94,15 @@ Otherwise build them in a controlled Node 24.x environment and ensure the deploy
 
 ## Database safety
 
-`DATABASE_URL` and `BACKUP_DIRECTORY` are production state. Before migration, create the verified backup shown above. SQLite runs with WAL; never copy only a live `.sqlite` file because recent writes can be in the WAL. Use the application's online backup or stop the one writer and preserve the complete SQLite state.
+`DATABASE_URL` and `BACKUP_DIRECTORY` are production state. Before migration, create the verified backup shown above. SQLite runs in verified rollback journal mode (`DELETE`), not WAL, because PythonAnywhere's filesystem is distributed and SQLite does not support WAL over network filesystems. `busy_timeout` is set before the mode transition. The first uncontended `db-upgrade`, `db-validate`, or application connection converts an existing persistent WAL database through SQLite's own `PRAGMA journal_mode=DELETE` operation and fails clearly if SQLite reports another mode. Never delete `-wal` or `-shm` files manually.
 
 The application is the sole expected writer. Do not run a second Flask instance, legacy Node server, cron import, or manual writer against the configured database. XLSX confirmation also creates a backup before its atomic catalog update.
+
+## Stateless authentication on the free plan
+
+Application and administrator sessions are separate timestamped signed cookies. Login, session validation, invalid-password handling, and CSRF lookup perform no SQLite operations. Cookie names, `HttpOnly`, `Secure`, `SameSite=Strict`, `/` path scope, session expiry, the two-level app/admin barrier, trusted-origin checks, and CSRF validation remain unchanged. Rotating `APP_PASSWORD_HASH` invalidates app sessions; rotating `ADMIN_PASSWORD_HASH` invalidates admin sessions.
+
+Login throttling is per process, keyed by login kind and a SHA-256 hash of the client address. It has a lock, an authoritative post-password-verification recheck, expiry pruning, and a bounded client map. The free PythonAnywhere plan runs one web worker, so no paid database is needed to make login independent of distributed-filesystem SQLite latency. Reloading or restarting that worker resets throttle history; treat that as the explicit tradeoff and continue monitoring repeated login failures at the platform boundary.
 
 ## Live verification after reload
 
@@ -114,6 +122,7 @@ Confirm all of the following:
 - The scanner bundle request succeeds and serves the current build.
 - HTTPS `/login` works; `/` redirects without an application session.
 - `/admin` requires the application session first and then the independent admin login.
+- Existing sessions survive a normal worker reload when password hashes are unchanged; changing either hash invalidates only that session kind.
 - A manual search works; scanner camera access works on HTTPS; an admin product search/editor action and an isolated XLSX preview can be completed safely.
 
 PythonAnywhere can serve `/static/` directly, which bypasses Flask-provided headers. If direct static mapping omits `Service-Worker-Allowed: /`, configure the static serving path to preserve that header; otherwise the worker cannot use the required `/` scope.
@@ -137,6 +146,6 @@ If a browser keeps an old scanner or service worker:
 - [ ] `db-upgrade` and `db-validate` succeeded.
 - [ ] The Web app was reloaded after the pull/build/configuration change.
 - [ ] WASM, service-worker body/version/header, and scanner bundle were checked live.
-- [ ] Authentication, search, admin barrier, and an isolated preview were verified over HTTPS.
+- [ ] Authentication, search, admin barrier, CSRF rejection, and an isolated preview were verified over HTTPS.
 
-To roll back, stop or reload the Web app only after selecting a verified backup. Restore it to a new private path, point `DATABASE_URL` to that path, run `db-validate`, and reload with exactly one writer. Do not restore a database under `/static/` or replace a live SQLite file by copying a single `.sqlite` file while WAL is active.
+To roll back, stop or reload the Web app only after selecting a verified backup. Restore it to a new private path, point `DATABASE_URL` to that path, run `db-validate`, and reload with exactly one writer. Do not restore a database under `/static/`, replace a live SQLite file piecemeal, or delete journal sidecars manually.

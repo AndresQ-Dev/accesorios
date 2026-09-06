@@ -1,14 +1,14 @@
 # Arquitectura técnica de Accesorios
 
-Accesorios es una aplicación privada para consultar precios y administrar el catálogo. Flask sobre Python 3.13 sirve vistas Jinja y la API JSON `/api/v1`; SQLite conserva catálogo y estado operacional; el escáner corre en el navegador con ZXing WASM. Este documento es la referencia de comportamiento actual, no una propuesta de funcionalidades futuras.
+Accesorios es una aplicación privada para consultar precios y administrar el catálogo. Flask sobre Python 3.13 sirve vistas Jinja y la API JSON `/api/v1`; SQLite conserva catálogo, previews y auditoría, mientras que la autenticación no depende de la base; el escáner corre en el navegador con ZXing WASM. Este documento es la referencia de comportamiento actual, no una propuesta de funcionalidades futuras.
 
 ## Vista rápida
 
 | Área | Decisión actual |
 |---|---|
 | Runtime | Python `>=3.13,<3.14`, Flask, Jinja y WSGI. Node `24.x` construye los assets del scanner. |
-| Datos | SQLite con WAL, claves foráneas y transacciones de escritura `BEGIN IMMEDIATE`. |
-| Autenticación | Sesión de aplicación para `/`; sesión admin adicional para `/admin` y APIs admin. |
+| Datos | SQLite con journal rollback `DELETE`, claves foráneas y transacciones de escritura `BEGIN IMMEDIATE`. |
+| Autenticación | Tokens firmados y temporizados: sesión de aplicación para `/`; sesión admin adicional para `/admin` y APIs admin. |
 | Consulta | `GET /api/v1/search?q=` devuelve coincidencias ordenadas y metadata del catálogo. |
 | Administración UI | Búsqueda/editor de producto, filtro de precios pendientes y preview/confirmación XLSX. |
 | PWA | Cache-first sólo para una lista cerrada de estáticos; HTML, navegaciones y API van a red. |
@@ -40,7 +40,15 @@ Accesorios es una aplicación privada para consultar precios y administrar el ca
 | Lecturas admin | Sesión admin; la sesión de aplicación es prerrequisito. |
 | Mutaciones admin | Sesión admin + `Origin` confiable + header `X-CSRF-Token`. |
 
-Las cookies son `HttpOnly`, `Secure` en producción y `SameSite=Strict`. La base guarda hashes de tokens, no tokens crudos. La validación de `Origin` compara con `TRUSTED_ORIGIN` (o con el origen de la petición cuando no se configura), y el CSRF se valida server-side. `noindex` ayuda a evitar indexación: no reemplaza estas barreras.
+Session cookies are timestamped and signed with separate app/admin contexts. They are `HttpOnly`, `Secure` in production, `SameSite=Strict`, and scoped to `/`. The signed payload carries the session kind, a random session identifier, and the CSRF token; it is not stored in SQLite. Validation enforces the configured lifetime and rejects tampering or the wrong session kind. Rotating the corresponding password hash changes the derived signing key and invalidates that kind's active sessions. The signing key is never returned to the client.
+
+`Origin` validation still compares against `TRUSTED_ORIGIN` (or the request origin when it is not configured), and state-changing admin requests still require the exact `X-CSRF-Token`. The app session remains a prerequisite for admin authentication. `noindex` only discourages indexing and does not replace these controls.
+
+### Login throttling
+
+Login failures are throttled in process memory by session kind and a SHA-256 hash of the client address. A lock protects both the fast pre-verification check and the authoritative post-verification recheck, so concurrent password checks cannot exceed the limit. Expired buckets are pruned and the number of client buckets is bounded. A successful password clears only its own kind/client bucket.
+
+PythonAnywhere's free plan runs one web worker for this app, so this removes SQLite from both successful and invalid login paths without requiring a paid database. A worker reload or restart resets throttle history; this is the explicit availability tradeoff for avoiding unreliable network-filesystem writes during login. Signed sessions remain valid across restarts while their password hash and age remain valid.
 
 ### Credenciales y estado privado
 
@@ -171,14 +179,15 @@ Los headers XLSX aprobados son `Código`, `C.Barras`, `Articulo`, `Stock fisico`
 |---|---|
 | `products` | Catálogo, `price_ars` nullable, revisión optimista y timestamps. |
 | `categories` / `barcode_aliases` | Categorías y aliases de barcode. |
-| `app_sessions` / `admin_sessions` | Sesiones separadas con CSRF y expiración. |
+| `app_sessions` / `admin_sessions` | Tablas legacy conservadas para compatibilidad de migración; la autenticación actual no las lee ni escribe. |
+| `login_attempts` | Tabla legacy conservada para compatibilidad de migración; el throttle actual es por proceso. |
 | `import_previews` | Preview persistente con actor, hash, versión base, filas y vencimiento. |
 | `import_runs` / `audit_log` | Trazabilidad de confirmaciones y operaciones admin. |
 | `catalog_metadata` | Versión global usada para detectar conflictos. |
 
-SQLite usa `foreign_keys=ON`, `journal_mode=WAL` y `busy_timeout=5000`. Las escrituras usan `BEGIN IMMEDIATE`. `db-upgrade` aplica migraciones y `db-validate` comprueba el esquema. `backup-create` y la confirmación XLSX usan el backup online de SQLite, escriben checksum SHA-256 y aplican retención.
+SQLite uses `foreign_keys=ON`, verified `journal_mode=DELETE`, and `busy_timeout=5000`; the busy timeout is configured before any journal transition. WAL is unsupported on PythonAnywhere's distributed filesystem, so every physical connection requires rollback mode and fails clearly if SQLite does not report `delete`. Existing persistent WAL databases transition through SQLite's own PRAGMA on the first uncontended connection; WAL/SHM files must never be deleted manually. SQLAlchemy checkout pre-ping is disabled to avoid an unnecessary filesystem round trip. Writes still use `BEGIN IMMEDIATE`.
 
-No copiar solamente `catalog.sqlite` de una instancia viva con WAL: usar el backup online o detener el único writer e incluir el estado WAL. Nunca ejecutar un segundo writer, importador legacy o cron contra la misma base.
+`db-upgrade` applies migrations and `db-validate` verifies the schema and journal mode. `backup-create` and XLSX confirmation use SQLite's online backup, write a SHA-256 checksum, and enforce retention. Never run a second writer, legacy importer, or cron process against the same database.
 
 ## PWA y ciclo de cache
 

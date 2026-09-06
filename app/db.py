@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -12,6 +13,25 @@ from sqlalchemy.engine import URL
 _engines: dict[Path, Engine] = {}
 
 
+def configure_sqlite_connection(dbapi_connection: sqlite3.Connection, _record: Any) -> None:
+    cursor = dbapi_connection.cursor()
+    try:
+        cursor.execute("PRAGMA busy_timeout = 5000")
+        try:
+            cursor.execute("PRAGMA journal_mode = DELETE")
+            mode_row = cursor.fetchone()
+        except sqlite3.DatabaseError as error:
+            raise RuntimeError("SQLite journal mode transition to DELETE failed.") from error
+        actual_mode = str(mode_row[0]).lower() if mode_row else "missing"
+        if actual_mode != "delete":
+            raise RuntimeError(
+                f"SQLite journal mode transition to DELETE failed; database reported {actual_mode!r}."
+            )
+        cursor.execute("PRAGMA foreign_keys = ON")
+    finally:
+        cursor.close()
+
+
 def engine_for(path: Path) -> Engine:
     resolved = path.resolve()
     if resolved not in _engines:
@@ -19,16 +39,8 @@ def engine_for(path: Path) -> Engine:
         engine = create_engine(
             URL.create("sqlite+pysqlite", database=str(resolved)),
             future=True,
-            pool_pre_ping=True,
         )
-
-        @event.listens_for(engine, "connect")
-        def configure_sqlite(dbapi_connection: Any, _record: Any) -> None:
-            cursor = dbapi_connection.cursor()
-            cursor.execute("PRAGMA foreign_keys = ON")
-            cursor.execute("PRAGMA journal_mode = WAL")
-            cursor.execute("PRAGMA busy_timeout = 5000")
-            cursor.close()
+        event.listen(engine, "connect", configure_sqlite_connection)
 
         _engines[resolved] = engine
     return _engines[resolved]
@@ -101,6 +113,8 @@ def validate_schema(engine: Engine | None = None) -> list[str]:
     with target.connect() as connection:
         if connection.execute(text("PRAGMA foreign_keys")).scalar_one() != 1:
             problems.append("foreign_keys pragma is disabled")
+        if str(connection.execute(text("PRAGMA journal_mode")).scalar_one()).lower() != "delete":
+            problems.append("journal_mode pragma must be DELETE")
         alias = connection.execute(
             text("SELECT product_id FROM barcode_aliases WHERE alias = '04440000015833'")
         ).scalar_one_or_none() if "barcode_aliases" in table_names else None

@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import hashlib
-import sqlite3
+import queue
+import threading
 from collections.abc import Callable
-from pathlib import Path
 
+from flask import Flask
 from flask.testing import FlaskClient
-from sqlalchemy.exc import OperationalError
 
 from app import auth
-from app.db import write_connection
+from app import db as database
 from tests_py.conftest import ORIGIN
 
 
@@ -79,41 +79,196 @@ def test_scan_debug_requires_app_auth_validates_shape_and_logs(
     assert invalid.status_code == 400
 
 
-def test_sessions_store_only_token_hashes_and_secure_cookies(
+def test_successful_app_and_admin_authentication_never_accesses_sqlite(
     client: FlaskClient,
-    database_path: Path,
     passwords: dict[str, str],
-) -> None:
-    response = client.post(
+    monkeypatch,
+) -> None:  # type: ignore[no-untyped-def]
+    def forbidden_connection():  # type: ignore[no-untyped-def]
+        raise AssertionError("authentication must not access SQLite")
+
+    monkeypatch.setattr(database, "read_connection", forbidden_connection)
+    monkeypatch.setattr(database, "write_connection", forbidden_connection)
+    monkeypatch.setattr(auth, "read_connection", forbidden_connection, raising=False)
+    monkeypatch.setattr(auth, "write_connection", forbidden_connection, raising=False)
+
+    app_response = client.post(
         "/api/v1/login",
         json={"password": passwords["app"]},
         headers={"Origin": ORIGIN},
         base_url=ORIGIN,
     )
-    assert response.status_code == 200
-    cookie_header = response.headers["Set-Cookie"]
-    assert "HttpOnly" in cookie_header
-    assert "Secure" in cookie_header
-    assert "SameSite=Strict" in cookie_header
-    token = client.get_cookie("app_session", domain="local.test").value
-    connection = sqlite3.connect(database_path)
-    stored = connection.execute("SELECT token_hash FROM app_sessions").fetchone()[0]
-    connection.close()
-    assert stored == hashlib.sha256(token.encode()).hexdigest()
-    assert token not in stored
+    admin_response = client.post(
+        "/api/v1/admin/login",
+        json={"password": passwords["admin"]},
+        headers={"Origin": ORIGIN},
+        base_url=ORIGIN,
+    )
+
+    assert app_response.status_code == 200
+    assert admin_response.status_code == 200
+    assert client.get("/", base_url=ORIGIN).status_code == 200
+    assert client.get("/admin", base_url=ORIGIN).status_code == 200
 
 
-def test_session_expiry_is_enforced(
+def test_invalid_app_and_admin_authentication_never_accesses_sqlite(
     client: FlaskClient,
-    database_path: Path,
+    passwords: dict[str, str],
+    monkeypatch,
+) -> None:  # type: ignore[no-untyped-def]
+    def forbidden_connection():  # type: ignore[no-untyped-def]
+        raise AssertionError("authentication must not access SQLite")
+
+    monkeypatch.setattr(database, "read_connection", forbidden_connection)
+    monkeypatch.setattr(database, "write_connection", forbidden_connection)
+    monkeypatch.setattr(auth, "read_connection", forbidden_connection, raising=False)
+    monkeypatch.setattr(auth, "write_connection", forbidden_connection, raising=False)
+
+    invalid_app = client.post(
+        "/api/v1/login",
+        json={"password": "wrong-app-password"},
+        headers={"Origin": ORIGIN},
+        base_url=ORIGIN,
+    )
+    valid_app = client.post(
+        "/api/v1/login",
+        json={"password": passwords["app"]},
+        headers={"Origin": ORIGIN},
+        base_url=ORIGIN,
+    )
+    invalid_admin = client.post(
+        "/api/v1/admin/login",
+        json={"password": "wrong-admin-password"},
+        headers={"Origin": ORIGIN},
+        base_url=ORIGIN,
+    )
+
+    assert invalid_app.status_code == 401
+    assert invalid_app.get_json()["error"]["code"] == "INVALID_APP_PASSWORD"
+    assert valid_app.status_code == 200
+    assert invalid_admin.status_code == 401
+    assert invalid_admin.get_json()["error"]["code"] == "INVALID_ADMIN_PASSWORD"
+
+
+def test_signed_session_cookies_preserve_security_attributes(
+    client: FlaskClient,
+    passwords: dict[str, str],
+) -> None:
+    app_response = client.post(
+        "/api/v1/login",
+        json={"password": passwords["app"]},
+        headers={"Origin": ORIGIN},
+        base_url=ORIGIN,
+    )
+    admin_response = client.post(
+        "/api/v1/admin/login",
+        json={"password": passwords["admin"]},
+        headers={"Origin": ORIGIN},
+        base_url=ORIGIN,
+    )
+
+    for response, cookie_name in (
+        (app_response, "app_session"),
+        (admin_response, "admin_session"),
+    ):
+        assert response.status_code == 200
+        cookie_header = response.headers["Set-Cookie"]
+        assert cookie_header.startswith(f"{cookie_name}=")
+        assert "HttpOnly" in cookie_header
+        assert "Secure" in cookie_header
+        assert "SameSite=Strict" in cookie_header
+        assert "Path=/" in cookie_header
+        token = client.get_cookie(cookie_name, domain="local.test").value
+        assert passwords[f"{cookie_name.removesuffix('_session')}_hash"] not in token
+
+
+def test_tampered_session_token_is_rejected(
+    client: FlaskClient,
     login_app: Callable[[], str],
 ) -> None:
     login_app()
-    connection = sqlite3.connect(database_path)
-    connection.execute("UPDATE app_sessions SET expires_at = ?", ("2000-01-01T00:00:00.000Z",))
-    connection.commit()
-    connection.close()
+    token = client.get_cookie("app_session", domain="local.test").value
+    tampered = ("A" if token[0] != "A" else "B") + token[1:]
+    client.set_cookie("app_session", tampered, domain="local.test", secure=True)
+
+    response = client.get("/api/v1/search?q=test", base_url=ORIGIN)
+
+    assert response.status_code == 401
+    assert response.get_json()["error"]["code"] == "UNAUTHENTICATED"
+
+
+def test_session_expiry_is_enforced(
+    app: Flask,
+    client: FlaskClient,
+    login_app: Callable[[], str],
+) -> None:
+    login_app()
+    app.config["SESSION_SECONDS"] = -1
     assert client.get("/api/v1/search?q=test", base_url=ORIGIN).status_code == 401
+
+
+def test_app_and_admin_tokens_are_not_interchangeable(
+    client: FlaskClient,
+    login_admin: Callable[[], str],
+) -> None:
+    login_admin()
+    app_token = client.get_cookie("app_session", domain="local.test").value
+    admin_token = client.get_cookie("admin_session", domain="local.test").value
+
+    client.set_cookie("app_session", admin_token, domain="local.test", secure=True)
+    assert client.get("/api/v1/search?q=test", base_url=ORIGIN).status_code == 401
+
+    client.set_cookie("app_session", app_token, domain="local.test", secure=True)
+    client.set_cookie("admin_session", app_token, domain="local.test", secure=True)
+    assert client.get("/api/v1/admin/categories", base_url=ORIGIN).status_code == 401
+
+
+def test_signed_token_payload_must_match_session_kind(
+    app: Flask,
+    client: FlaskClient,
+    login_admin: Callable[[], str],
+) -> None:
+    login_admin()
+    with app.app_context():
+        wrong_kind = auth._session_serializer("admin").dumps(
+            {"kind": "app", "csrf": "csrf", "session": "session"}
+        )
+    client.set_cookie("admin_session", wrong_kind, domain="local.test", secure=True)
+
+    response = client.get("/api/v1/admin/categories", base_url=ORIGIN)
+
+    assert response.status_code == 401
+    assert response.get_json()["error"]["code"] == "UNAUTHENTICATED"
+
+
+def test_password_hash_rotation_invalidates_each_session_kind(
+    app: Flask,
+    client: FlaskClient,
+    login_admin: Callable[[], str],
+) -> None:
+    login_admin()
+    original_app_hash = app.config["APP_PASSWORD_HASH"]
+    app.config["APP_PASSWORD_HASH"] = auth.create_password_hash("rotated-app-password")
+    assert client.get("/api/v1/search?q=test", base_url=ORIGIN).status_code == 401
+
+    app.config["APP_PASSWORD_HASH"] = original_app_hash
+    app.config["ADMIN_PASSWORD_HASH"] = auth.create_password_hash("rotated-admin-password")
+    response = client.get("/api/v1/admin/categories", base_url=ORIGIN)
+    assert response.status_code == 401
+    assert response.get_json()["error"]["code"] == "UNAUTHENTICATED"
+
+
+def test_admin_session_still_requires_application_session(
+    client: FlaskClient,
+    login_admin: Callable[[], str],
+) -> None:
+    login_admin()
+    client.delete_cookie("app_session", domain="local.test")
+
+    response = client.get("/api/v1/admin/categories", base_url=ORIGIN)
+
+    assert response.status_code == 401
+    assert response.get_json()["error"]["code"] == "UNAUTHENTICATED"
 
 
 def test_origin_csrf_and_error_contracts(
@@ -157,81 +312,115 @@ def test_bounded_login_throttling_does_not_change_invalid_credential_response(
     assert statuses[3] == (429, "LOGIN_THROTTLED")
 
 
-def test_login_does_not_hold_a_writer_lock_during_password_verification(
+def test_login_throttling_is_separate_for_app_and_admin(
+    app: Flask,
     client: FlaskClient,
-    database_path: Path,
-    monkeypatch,
-) -> None:  # type: ignore[no-untyped-def]
-    def verify_with_writer_probe(_encoded_hash: str, _password: str) -> bool:
-        with sqlite3.connect(database_path, timeout=0) as probe:
-            probe.execute("BEGIN IMMEDIATE")
-            probe.rollback()
-        return True
-
-    monkeypatch.setattr(auth, "verify_password", verify_with_writer_probe)
-
-    response = client.post(
+    passwords: dict[str, str],
+) -> None:
+    app.config["LOGIN_MAX_ATTEMPTS"] = 1
+    assert client.post(
         "/api/v1/login",
-        json={"password": "any-password"},
+        json={"password": passwords["app"]},
+        headers={"Origin": ORIGIN},
+        base_url=ORIGIN,
+    ).status_code == 200
+
+    invalid_admin = client.post(
+        "/api/v1/admin/login",
+        json={"password": "wrong"},
+        headers={"Origin": ORIGIN},
+        base_url=ORIGIN,
+    )
+    blocked_admin = client.post(
+        "/api/v1/admin/login",
+        json={"password": "wrong"},
+        headers={"Origin": ORIGIN},
+        base_url=ORIGIN,
+    )
+    app_login = client.post(
+        "/api/v1/login",
+        json={"password": passwords["app"]},
         headers={"Origin": ORIGIN},
         base_url=ORIGIN,
     )
 
-    assert response.status_code == 200
+    assert invalid_admin.status_code == 401
+    assert blocked_admin.status_code == 429
+    assert app_login.status_code == 200
 
 
-def test_login_authoritatively_rechecks_throttle_after_password_verification(
-    app,
-    client: FlaskClient,
-    database_path: Path,
+def test_login_authoritatively_rechecks_throttle_for_concurrent_attempts(
+    app: Flask,
     monkeypatch,
 ) -> None:  # type: ignore[no-untyped-def]
     app.config["LOGIN_MAX_ATTEMPTS"] = 1
+    verification_barrier = threading.Barrier(2)
+    results: queue.SimpleQueue[tuple[int, str]] = queue.SimpleQueue()
 
-    def interleaved_failed_attempt(_encoded_hash: str, _password: str) -> bool:
-        with write_connection() as connection:
-            auth._record_failed_login(connection, "app-login", auth._client_key())
+    def synchronized_failure(_encoded_hash: str, _password: str) -> bool:
+        verification_barrier.wait(timeout=5)
         return False
 
-    monkeypatch.setattr(auth, "verify_password", interleaved_failed_attempt)
+    def attempt() -> None:
+        with app.test_client() as concurrent_client:
+            response = concurrent_client.post(
+                "/api/v1/login",
+                json={"password": "wrong"},
+                headers={"Origin": ORIGIN},
+                base_url=ORIGIN,
+            )
+            results.put((response.status_code, response.get_json()["error"]["code"]))
 
-    response = client.post(
-        "/api/v1/login",
-        json={"password": "any-password"},
-        headers={"Origin": ORIGIN},
-        base_url=ORIGIN,
-    )
+    monkeypatch.setattr(auth, "verify_password", synchronized_failure)
+    threads = [threading.Thread(target=attempt) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10)
 
-    assert response.status_code == 429
-    assert response.get_json()["error"]["code"] == "LOGIN_THROTTLED"
-    with sqlite3.connect(database_path) as connection:
-        assert connection.execute("SELECT COUNT(*) FROM login_attempts").fetchone()[0] == 1
+    assert all(not thread.is_alive() for thread in threads)
+    assert sorted(results.get_nowait() for _ in threads) == [
+        (401, "INVALID_APP_PASSWORD"),
+        (429, "LOGIN_THROTTLED"),
+    ]
 
 
-def test_sqlite_login_lock_returns_retryable_busy_error(
+def test_login_throttle_expires_attempts_and_bounds_client_buckets(
+    app: Flask,
     client: FlaskClient,
     monkeypatch,
 ) -> None:  # type: ignore[no-untyped-def]
-    def locked_writer():
-        raise OperationalError("BEGIN IMMEDIATE", {}, sqlite3.OperationalError("database is locked"))
+    app.config["LOGIN_MAX_ATTEMPTS"] = 1
+    clock = [1000.0]
+    monkeypatch.setattr(auth, "_throttle_now", lambda: clock[0])
+    monkeypatch.setattr(auth, "_MAX_THROTTLE_CLIENTS", 2)
 
-    monkeypatch.setattr(auth, "verify_password", lambda _encoded_hash, _password: True)
-    monkeypatch.setattr(auth, "write_connection", locked_writer)
+    addresses = ["192.0.2.1", "192.0.2.2", "192.0.2.3"]
+    for address in addresses:
+        response = client.post(
+            "/api/v1/login",
+            json={"password": "wrong"},
+            headers={"Origin": ORIGIN},
+            base_url=ORIGIN,
+            environ_base={"REMOTE_ADDR": address},
+        )
+        assert response.status_code == 401
 
+    assert len(auth._throttle_attempts) == 2
+    stored_keys = {key for _kind, key in auth._throttle_attempts}
+    assert hashlib.sha256(addresses[0].encode()).hexdigest() not in stored_keys
+    assert addresses[1] not in repr(auth._throttle_attempts)
+
+    clock[0] += app.config["LOGIN_WINDOW_SECONDS"] + 1
     response = client.post(
         "/api/v1/login",
-        json={"password": "any-password"},
+        json={"password": "wrong"},
         headers={"Origin": ORIGIN},
         base_url=ORIGIN,
+        environ_base={"REMOTE_ADDR": "192.0.2.4"},
     )
-
-    assert response.status_code == 503
-    assert response.headers["Retry-After"] == "2"
-    assert response.get_json()["error"] == {
-        "code": "LOGIN_BUSY",
-        "message": "Login is temporarily unavailable. Try again later.",
-        "requestId": response.headers["X-Request-Id"],
-    }
+    assert response.status_code == 401
+    assert len(auth._throttle_attempts) == 1
 
 
 def test_login_timing_log_is_structured_and_excludes_sensitive_values(
@@ -256,10 +445,12 @@ def test_login_timing_log_is_structured_and_excludes_sensitive_values(
     assert response.status_code == 200
     assert len(logged) == 1
     message = logged[0]
-    assert "precheck_ms=" in message
-    assert "verify_ms=" in message
-    assert "write_ms=" in message
+    assert "throttle_precheck_ms=" in message
+    assert "password_verify_ms=" in message
+    assert "throttle_finalize_ms=" in message
+    assert "token_issue_ms=" in message
     assert "total_ms=" in message
+    assert "write_ms=" not in message
     assert "session_kind=app result=success" in message
     assert f"request_id={response.headers['X-Request-Id']}" in message
     assert passwords["app"] not in message

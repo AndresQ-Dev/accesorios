@@ -4,10 +4,11 @@ import hashlib
 import sqlite3
 from pathlib import Path
 
+import pytest
 from flask import Flask
 
 from app.backups import create_backup, enforce_retention, verify_backup
-from app.db import engine_for, validate_schema
+from app.db import configure_sqlite_connection, dispose_engines, engine_for, validate_schema
 from tests_py.conftest import migrate
 
 LEGACY_DRIZZLE_SCHEMA = """
@@ -95,13 +96,72 @@ def test_alembic_adopts_drizzle_schema_without_changing_ids_or_timestamps(tmp_pa
     assert validate_schema(engine_for(path)) == []
 
 
-def test_fresh_schema_enables_foreign_keys_wal_and_validation(database_path: Path) -> None:
+def test_fresh_schema_enables_foreign_keys_delete_journal_and_validation(database_path: Path) -> None:
     engine = engine_for(database_path)
     with engine.connect() as connection:
         assert connection.exec_driver_sql("PRAGMA foreign_keys").scalar_one() == 1
-        assert connection.exec_driver_sql("PRAGMA journal_mode").scalar_one() == "wal"
+        assert connection.exec_driver_sql("PRAGMA journal_mode").scalar_one() == "delete"
         assert connection.exec_driver_sql("PRAGMA busy_timeout").scalar_one() == 5000
     assert validate_schema(engine) == []
+
+
+def test_existing_persistent_wal_database_transitions_to_delete_journal(tmp_path: Path) -> None:
+    path = tmp_path / "existing-wal.sqlite"
+    connection = sqlite3.connect(path)
+    try:
+        connection.execute("PRAGMA journal_mode = WAL").fetchone()
+        connection.execute("CREATE TABLE sentinel (value TEXT NOT NULL)")
+        connection.execute("INSERT INTO sentinel VALUES ('preserved')")
+        connection.commit()
+    finally:
+        connection.close()
+
+    try:
+        engine = engine_for(path)
+        with engine.connect() as connection:
+            assert connection.exec_driver_sql("PRAGMA journal_mode").scalar_one() == "delete"
+            assert connection.exec_driver_sql("SELECT value FROM sentinel").scalar_one() == "preserved"
+    finally:
+        dispose_engines()
+
+    connection = sqlite3.connect(path)
+    try:
+        assert connection.execute("PRAGMA journal_mode").fetchone()[0] == "delete"
+    finally:
+        connection.close()
+
+
+def test_journal_mode_configuration_checks_return_value_after_setting_busy_timeout() -> None:
+    class Cursor:
+        def __init__(self) -> None:
+            self.commands: list[str] = []
+            self.closed = False
+
+        def execute(self, command: str) -> None:
+            self.commands.append(command)
+
+        def fetchone(self) -> tuple[str]:
+            return ("wal",)
+
+        def close(self) -> None:
+            self.closed = True
+
+    class Connection:
+        def __init__(self) -> None:
+            self.cursor_value = Cursor()
+
+        def cursor(self) -> Cursor:
+            return self.cursor_value
+
+    connection = Connection()
+    with pytest.raises(RuntimeError, match="reported 'wal'"):
+        configure_sqlite_connection(connection, None)  # type: ignore[arg-type]
+
+    assert connection.cursor_value.commands == [
+        "PRAGMA busy_timeout = 5000",
+        "PRAGMA journal_mode = DELETE",
+    ]
+    assert connection.cursor_value.closed is True
 
 
 def test_migration_rebuilds_legacy_not_null_product_prices(tmp_path: Path) -> None:

@@ -12,12 +12,19 @@ from flask.testing import FlaskClient
 from openpyxl import Workbook
 
 from alembic import command
-from app import create_app
+from app import auth, create_app
 from app.auth import create_password_hash
 from app.db import dispose_engines
 
 ORIGIN = "https://local.test"
 XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+@pytest.fixture(autouse=True)
+def reset_login_throttle() -> Iterator[None]:
+    auth._reset_login_throttle()
+    yield
+    auth._reset_login_throttle()
 
 
 def migrate(path: Path) -> None:
